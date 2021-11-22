@@ -85,8 +85,7 @@ jobs:
 
       - name: Fix
         run: |
-          mkdir -p static/node_modules/
-          cp -rv node_modules/electron-log static/node_modules/
+          cd static && yarn
 
       - name: Run Playwright test
         run: xvfb-run -- yarn e2e-test
