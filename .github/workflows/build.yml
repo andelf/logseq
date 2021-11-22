@@ -84,4 +84,7 @@ jobs:
         run: yarn release
 
       - name: Run Playwright test
-        run: xvfb-run --auto-servernum -- yarn e2e-test
+        run: xvfb-run -- yarn e2e-test
+        env:
+          DEBUG: "pw:browser*"
+
