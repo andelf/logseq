@@ -79,3 +79,6 @@ jobs:
         run: |
           yarn cljs:test
           node static/tests.js
+
+      - name: Run playwright test
+        run: xvfb-run --auto-servernum -- yarn e2e-test
