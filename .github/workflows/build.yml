@@ -80,5 +80,8 @@ jobs:
           yarn cljs:test
           node static/tests.js
 
-      - name: Run playwright test
+      - name: Prepare for Playwright test
+        run: yarn release
+
+      - name: Run Playwright test
         run: xvfb-run --auto-servernum -- yarn e2e-test
