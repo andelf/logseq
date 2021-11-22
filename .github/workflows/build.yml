@@ -83,9 +83,9 @@ jobs:
       - name: Prepare for Playwright test
         run: yarn release
 
-      - name: Fix
+      - name: Prepare Electron build
         run: |
-          cd static && yarn
+          cd static && yarn && yarn rebuild:better-sqlite3
 
       - name: Run Playwright test
         run: xvfb-run -- yarn e2e-test
