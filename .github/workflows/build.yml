@@ -83,6 +83,11 @@ jobs:
       - name: Prepare for Playwright test
         run: yarn release
 
+      - name: Fix
+        run: |
+          mkdir -p static/node_modules/
+          cp -rv node_modules/electron-log static/node_modules/
+
       - name: Run Playwright test
         run: xvfb-run -- yarn e2e-test
         env:

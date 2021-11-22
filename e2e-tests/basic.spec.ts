@@ -19,7 +19,8 @@ function randomString(length: number) {
 
 test.beforeAll(async () => {
   electronApp = await electron.launch({
-    args: ["./static/electron.js"],
+    cwd: "./static",
+    args: ["electron.js"],
     recordVideo: {
       dir: "./videos",
     }
