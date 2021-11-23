@@ -35,7 +35,7 @@ test.beforeAll(async () => {
     // the result of the require('electron') in the main app script.
     return app.getAppPath()
   })
-  console.log("AppPath:", appPath)
+  console.log("Test start with AppPath:", appPath)
 })
 
 test.beforeEach(async () => {
