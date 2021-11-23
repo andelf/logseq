@@ -85,7 +85,10 @@ jobs:
 
       - name: Prepare Electron build
         run: |
-          cd static && yarn && yarn rebuild:better-sqlite3
+          yarn install && yarn rebuild:better-sqlite3
+        working-directory: ./static
+        env:
+          DEBUG: "electron-rebuild"
 
       - name: Run Playwright test
         run: xvfb-run -- yarn e2e-test
