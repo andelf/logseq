@@ -59,7 +59,7 @@
               :externs ["datascript/externs.js"
                         "externs.js"]
               :warnings {:fn-deprecated false}}}
-
+  
   :parser-worker
   {:target :browser
    :output-dir "./static/js"
@@ -68,9 +68,15 @@
                       :source-map-include-sources-content false}
    :modules {:parser-worker {:entries [frontend.worker.parser]
                              :web-worker true
-                             :prepend #shadow/env ["PATCH_PARSER_WORKER" :default ";;"]
-                             }}
+                             :prepend #shadow/env ["PATCH_PARSER_WORKER" :default ";;"]}}
    :release {:compiler-options {:infer-externs :auto}}}
+
+  :e2e-test
+  {:target :node-script
+   :output-to "./tests-out/e2e-test.spec.js"
+   :main e2e.core/main
+   :compiler-options {:output-feature-set :es-next-in}
+   :devtools {:enabled false}}
 
   :test
   {:target :node-test
@@ -120,8 +126,7 @@
           :asset-path "/static/js/workspaces"
           :preloads   [] ; optional, list namespaces to be pre loaded
           :devtools
-          {
-           :after-load   nubank.workspaces.core/after-load
+          {:after-load   nubank.workspaces.core/after-load
            :loader-mode  :eval
            :http-root    "public/workspaces"
            :http-port    3002
