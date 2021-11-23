@@ -81,9 +81,16 @@ jobs:
           node static/tests.js
 
       - name: Run Playwright test
-        if: github.ref == 'refs/heads/master'
+        if: github.event_name == 'pull_request'
         run: |
           yarn release
           (cd static && yarn install && yarn rebuild:better-sqlite3)
           xvfb-run -- yarn e2e-test
+
+      - name: Save test artifacts
+        if: ${{ github.event_name == 'pull_request' && failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: e2e-test-report
+          path: artifacts.zip
 
