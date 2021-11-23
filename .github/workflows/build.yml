@@ -80,19 +80,10 @@ jobs:
           yarn cljs:test
           node static/tests.js
 
-  e2e-test:
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/master'
-    steps:
-      - name: Prepare for Playwright test
-        run: yarn release
-
-      - name: Prepare Electron build
-        run: |
-          yarn install && yarn rebuild:better-sqlite3
-        working-directory: ./static
-
       - name: Run Playwright test
-        run: xvfb-run -- yarn e2e-test
+        if: github.ref == 'refs/heads/master'
+        run: |
+          yarn release
+          (cd static && yarn install && yarn rebuild:better-sqlite3)
+          xvfb-run -- yarn e2e-test
 
