@@ -238,9 +238,28 @@ test('template', async () => {
   await page.type(':nth-match(textarea, 1)', '/template')
 
   await page.click('[title="Insert a created template here"]')
+  // type to search template name
+  await page.keyboard.type(randomTemplate.substring(0, 3))
   await page.click('.absolute >> text=' + randomTemplate)
 
   await page.waitForTimeout(500)
 
   expect(await page.$$('.ls-block')).toHaveLength(8)
+})
+
+// FIXME: Electron with filechooser is not working
+test.skip('open directory', async () => {
+  page.on('filechooser', async (fileChooser) => {
+    console.log("file chooser")
+    await fileChooser.setFiles('./test-graph')
+    await page.keyboard.press('Enter')
+  });
+
+  await page.click('#sidebar-nav-wrapper >> text=Journals')
+  await page.click('h1:has-text("Open a local directory")')
+
+//  await page.waitForEvent('filechooser')
+  await page.keyboard.press('Escape')
+
+  await page.waitForTimeout(5000)
 })
