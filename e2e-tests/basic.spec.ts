@@ -21,9 +21,10 @@ test.beforeAll(async () => {
   electronApp = await electron.launch({
     cwd: "./static",
     args: ["electron.js"],
-    recordVideo: {
-      dir: "./videos",
-    }
+    // NOTE: video recording for Electron is not supported yet
+    // recordVideo: {
+    //   dir: "./videos",
+    // }
   })
 
   context = electronApp.context()
