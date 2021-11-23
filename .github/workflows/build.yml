@@ -85,7 +85,7 @@ jobs:
 
       - name: Prepare Electron build
         run: |
-          yarn install && yarn rebuild:better-sqlite3
+          yarn install && npx electron-forge make
         working-directory: ./static
         env:
           DEBUG: "electron-rebuild"
