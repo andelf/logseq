@@ -4,7 +4,7 @@ module.exports = {
   packagerConfig: {
     name: 'Logseq',
     icon: './icons/logseq_big_sur.icns',
-    osxSign: {
+   /* osxSign: {
       identity: 'Developer ID Application: Tiansheng Qin',
       'hardened-runtime': true,
       entitlements: 'entitlements.plist',
@@ -14,7 +14,7 @@ module.exports = {
     osxNotarize: {
       appleId: process.env['APPLE_ID'],
       appleIdPassword: process.env['APPLE_ID_PASSWORD'],
-    },
+    },*/
   },
   makers: [
     {
