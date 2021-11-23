@@ -85,13 +85,9 @@ jobs:
 
       - name: Prepare Electron build
         run: |
-          yarn install && npx electron-forge make && yarn rebuild:better-sqlite3
+          yarn install && yarn rebuild:better-sqlite3
         working-directory: ./static
-        env:
-          DEBUG: "electron-rebuild"
 
       - name: Run Playwright test
         run: xvfb-run -- yarn e2e-test
-        env:
-          DEBUG: "pw:browser*"
 
