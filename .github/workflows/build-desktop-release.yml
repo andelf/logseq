@@ -355,11 +355,6 @@ jobs:
     needs: [ build-macos-x64, build-linux, build-windows ]
     runs-on: ubuntu-18.04
     steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.inputs.git-ref }}
-
       - name: Download MacOS x64 Artifacts
         uses: actions/download-artifact@v2
         with:
@@ -394,22 +389,15 @@ jobs:
           sha256sum *-linux-* >> SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      - name: Generate Release Notes
-        run: |
-          echo '## Commit History' > RELEASE-NOTES.txt
-          git log --oneline --since "`date -d '-1 day'`" >> RELEASE-NOTES.txt
-          cat RELEASE-NOTES.txt
-
       - name: Update Nightly Release
         uses: andelf/nightly-release@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: daily
+          tag_name: nightly
           name: 'Desktop App Nightly Relase $$'
           draft: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.is-draft) || false }}
           prerelease: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.is-pre-release) || (github.event_name == 'schedule')}}
-          body_path: RELEASE-NOTES.txt
           files: |
             ./VERSION
             ./SHA256SUMS.txt
