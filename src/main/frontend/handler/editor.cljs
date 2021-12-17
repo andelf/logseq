@@ -47,6 +47,7 @@
             [frontend.util.page-property :as page-property]
             [frontend.util.property :as property]
             [frontend.util.thingatpt :as thingatpt]
+            [frontend.util.list :as list]
             [goog.dom :as gdom]
             [goog.dom.classes :as gdom-classes]
             [goog.object :as gobj]
@@ -1594,9 +1595,13 @@
       (util/electron?)
       (str "assets://" repo-dir path)
 
-      (mobile/is-native-platform?)
+      (mobile/native-android?)
       (mobile/convert-file-src
        (str "file://" repo-dir path))
+
+      (mobile/native-ios?)
+      (mobile/convert-file-src
+       (str repo-dir path))
 
       :else
       (let [handle-path (str "handle" repo-dir path)
@@ -2418,6 +2423,34 @@
                 (cursor/move-cursor-backward input move-to-pos)))
             (insert "\n")))))))
 
+(defn- dwim-in-list
+  [state]
+  (when-not (auto-complete?)
+    (let [{:keys [block]} (get-state)]
+      (when block
+        (let [input (state/get-input)]
+          (when-let [item (thingatpt/list-item-at-point input)]
+            (let [{:keys [full-content indent bullet checkbox ordered _]} item
+                  current-bullet (cljs.reader/read-string bullet)
+                  next-bullet (if ordered (str (inc current-bullet) ".") bullet)
+                  checkbox (when checkbox "[ ] ")]
+              (if (= (count full-content)
+                     (+ (if ordered (+ (count bullet) 2) 2) (when checkbox (count checkbox))))
+                (delete-and-update input (cursor/line-beginning-pos input) (cursor/line-end-pos input))
+                (do (cursor/move-cursor-to-line-end input)
+                    (insert (str "\n" indent next-bullet " " checkbox))
+                    (when ordered
+                      (let [bullet-atom (atom (inc current-bullet))]
+                        (while (when-let [next-item (list/get-next-item input)]
+                                 (swap! bullet-atom inc)
+                                 (let [{:keys [full-content start end]} next-item
+                                       new-bullet @bullet-atom]
+                                   (delete-and-update input start end)
+                                   (insert (string/replace-first full-content (:bullet next-item) new-bullet))
+                                   true))
+                          nil)
+                        (cursor/move-cursor-to input (+ (:end item) (count next-bullet) 2)))))))))))))
+
 (defn- keydown-new-block
   [state]
   (when-not (auto-complete?)
@@ -2441,7 +2474,7 @@
                   (when (thingatpt/get-setting :properties?)
                     (thingatpt/properties-at-point input))
                   (when (thingatpt/get-setting :list?)
-                    (and (cursor/end-of-line? input) ;; only apply DWIM when cursor at EOL
+                    (and (not (cursor/beginning-of-line? input))
                          (thingatpt/list-item-at-point input))))]
           (cond
             thing-at-point
@@ -2462,19 +2495,8 @@
               "page-ref" (when-not (string/blank? (:link thing-at-point))
                            (insert-first-page-block-if-not-exists! (:link thing-at-point))
                            (route-handler/redirect-to-page! (:link thing-at-point)))
-              "list-item"
-              (let [{:keys [full-content indent bullet checkbox ordered _]} thing-at-point
-                    next-bullet (if ordered
-                                  (str (inc (cljs.reader/read-string bullet)) ".")
-                                  bullet)
-                    checkbox (when checkbox "[ ] ")]
-                (if (= (count full-content)
-                       (+ (if ordered (+ (count bullet) 2) 2) (when checkbox (count checkbox))))
-                  (delete-and-update input (cursor/line-beginning-pos input) (cursor/line-end-pos input))
-                  (do (cursor/move-cursor-to-line-end input)
-                      (insert (str "\n" indent next-bullet " " checkbox)))))
-              "properties-drawer"
-              (dwim-in-properties state))
+              "list-item" (dwim-in-list state)
+              "properties-drawer" (dwim-in-properties state))
 
             (and
              (string/blank? content)
@@ -2788,9 +2810,14 @@
           metaKey (gobj/get e "metaKey")
           pos (cursor/pos input)
           shift? (.-shiftKey e)
-          code (gobj/getValueByKeys e "event_" "code")]
+          code (gobj/getValueByKeys e "event_" "code")
+          hashtag? (or (surround-by? input "#" " ")
+                       (surround-by? input "#" :end)
+                       (= key "#"))]
       (cond
-        (util/event-is-composing? e)
+        (and (util/event-is-composing? e true) ;; #3218
+             (not hashtag?) ;; #3283 @Rime
+             (not (state/get-editor-show-page-search-hashtag?))) ;; #3283 @MacOS pinyin
         nil
 
         (or ctrlKey metaKey)
@@ -2835,10 +2862,7 @@
           (util/stop e)
           (autopair input-id key format nil))
 
-        (or
-         (surround-by? input "#" " ")
-         (surround-by? input "#" :end)
-         (= key "#"))
+        hashtag?
         (do
           (commands/handle-step [:editor/search-page-hashtag])
           (state/set-last-pos! (cursor/pos input))
@@ -2879,8 +2903,11 @@
             c (util/nth-safe value (dec current-pos))
             last-key-code (state/get-last-key-code)
             blank-selected? (string/blank? (util/get-selected-text))
-            shift? (.-shiftKey e)]
-        (when-not (state/get-editor-show-input)
+            shift? (.-shiftKey e)
+            is-processed? (util/event-is-composing? e true) ;; #3440
+            non-enter-processed? (and is-processed? ;; #3251
+                                      (not= code "Enter"))] ;; #3459
+        (when-not (or (state/get-editor-show-input) non-enter-processed?)
           (cond
             (and (not (contains? #{"ArrowDown" "ArrowLeft" "ArrowRight" "ArrowUp"} k))
                  (not (:editor/show-page-search? @state/state))
@@ -2968,7 +2995,7 @@
 
             :else
             nil))
-        (when-not (= k "Shift")
+        (when-not (or (= k "Shift") is-processed?)
           (state/set-last-key-code! {:key-code key-code
                                      :code code
                                      :shift? (.-shiftKey e)}))))))

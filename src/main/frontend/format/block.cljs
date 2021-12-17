@@ -21,12 +21,6 @@
    (vector? block)
    (= "Heading" (first block))))
 
-(defn properties-block?
-  [block]
-  (and
-   (vector? block)
-   (= "Properties" (first block))))
-
 (defn get-tag
   [block]
   (when-let [tag-value (and (vector? block)
@@ -738,8 +732,7 @@
   ([block-uuid format pre-block? content]
    (when-not (string/blank? content)
      (let [content (if pre-block? content
-                       (str (config/get-block-pattern format) " " (string/triml content)))
-           content (property/remove-properties format content)]
+                       (str (config/get-block-pattern format) " " (string/triml content)))]
        (if-let [result (state/get-block-ast block-uuid content)]
          result
          (let [ast (->> (format/to-edn content format (mldoc/default-config format))
@@ -747,7 +740,7 @@
                title (when (heading-block? (first ast))
                        (:title (second (first ast))))
                body (vec (if title (rest ast) ast))
-               body (drop-while properties-block? body)
+               body (drop-while property/properties-ast? body)
                result (cond->
                         (if (seq body) {:block/body body} {})
                         title
