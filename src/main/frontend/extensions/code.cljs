@@ -190,17 +190,18 @@
   ([text]
    (text->cm-mode text :name))
   ([text by]
-   (let [mode (string/lower-case text)
-         find-fn-name (case by
-                        :name "findModeByName"
-                        :ext "findModeByExtension"
-                        :file-name "findModeByFileName"
-                        "findModeByName")
-         find-fn (gobj/get cm find-fn-name)
-         cm-mode (find-fn mode)]
-     (if cm-mode
-       (.-mime cm-mode)
-       mode))))
+   (when text
+     (let [mode (string/lower-case text)
+           find-fn-name (case by
+                          :name "findModeByName"
+                          :ext "findModeByExtension"
+                          :file-name "findModeByFileName"
+                          "findModeByName")
+           find-fn (gobj/get cm find-fn-name)
+           cm-mode (find-fn mode)]
+       (if cm-mode
+         (.-mime cm-mode)
+         mode)))))
 
 (defn render!
   [state]
