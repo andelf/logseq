@@ -102,7 +102,7 @@ jobs:
         run: |
           echo ${{ secrets.ANDROID_KEYSTORE }} | base64 -d > keystore.jks
           /usr/local/lib/android/sdk/build-tools/30.0.3/apksigner sign \
-            --ks keystore.jks --key-pass pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
+            --ks keystore.jks --ks-pass pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
             --in app/build/outputs/apk/release/app-release-unsigned.apk \
             --out app-signed.apk
         working-directory: android
