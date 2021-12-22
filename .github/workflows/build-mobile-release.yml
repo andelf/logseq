@@ -113,9 +113,9 @@ jobs:
 
       - name: Sign Android APK
         run: |
-          echo ${{ secret.ANDROID_KEYSTORE }} | base64 -d > keystore.jks
+          echo ${{ secrets.ANDROID_KEYSTORE }} | base64 -d > keystore.jks
           apksigner sign --ks keystore.jks \
-            --key-pass ${{ secret.ANDROID_KEYSTORE_PASSWORD }} \
+            --key-pass ${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
             --in app/build/outputs/apk/release/app-release-unsigned.apk \
             --out app-signed.apk
         working-directory: android
