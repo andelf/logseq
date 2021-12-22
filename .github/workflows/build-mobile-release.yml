@@ -17,7 +17,9 @@ on:
         required: true
     secrets:
       ANDROID_KEYSTORE:
+        required: true
       ANDROID_KEYSTORE_PASSWORD:
+        required: true
 
 env:
   CLOJURE_VERSION: '1.10.1.763'

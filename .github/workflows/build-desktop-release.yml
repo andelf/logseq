@@ -350,6 +350,7 @@ jobs:
           name: logseq-darwin-arm64-builds
           path: builds
 
+  # reuse workflow via workflow_call
   build-android:
     uses: andelf/logseq/.github/workflows/build-mobile-release.yml@master
     with:
