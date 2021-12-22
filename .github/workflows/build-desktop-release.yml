@@ -350,9 +350,12 @@ jobs:
           name: logseq-darwin-arm64-builds
           path: builds
 
+  build-android:
+    uses: .github/workflows/build-mobile-release.yml
+
   nightly-release:
     if: ${{ github.event_name == 'schedule' || github.event.inputs.build-target == 'nightly' }}
-    needs: [ build-macos-x64, build-linux ]
+    needs: [ build-macos-x64, build-linux, build-android ]
     runs-on: ubuntu-18.04
     steps:
       - name: Download MacOS x64 Artifacts
@@ -379,11 +382,18 @@ jobs:
       #    name: logseq-win64-builds
       #    path: ./
 
+      - name: Download Android Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: logseq-android-builds
+          path: ./
+
       - name: Generate SHA256 checksums
         run: |
           sha256sum *-darwin-* > SHA256SUMS.txt
           sha256sum *-win-* >> SHA256SUMS.txt
           sha256sum *-linux-* >> SHA256SUMS.txt
+          sha256sum *.apk >> SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: List files
@@ -412,6 +422,9 @@ jobs:
             ./*.dmg
             ./*.exe
             ./*.AppImage
+            ./*.apk
+
+
 
   release:
     # NOTE: For now, we only have beta channel to be released on Github
