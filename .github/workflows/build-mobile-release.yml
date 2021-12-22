@@ -11,9 +11,6 @@ on:
         required: true
         default: "beta"
 
- # schedule: # Every workday at the 2 P.M. (UTC) we run a scheduled nightly build
-  #  - cron: '0 14 * * MON-FRI'
-
 env:
   CLOJURE_VERSION: '1.10.1.763'
   NODE_VERSION: '16'
@@ -24,8 +21,6 @@ jobs:
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v2
-        #with:
-        #  ref: ${{ github.event.inputs.git-ref }}
 
       - name: Install Node.js, NPM and Yarn
         uses: actions/setup-node@v2
@@ -86,7 +81,6 @@ jobs:
           rm -rvf public/static/*.*
           rm -rvf public/static/ios
           rm -rvf android/app/src/main/assets/public || true
-          tree public/
 
       - name: Sync public to Android Project
         run: npx cap sync
@@ -104,7 +98,7 @@ jobs:
         run: |
           echo ${{ secrets.ANDROID_KEYSTORE }} | base64 -d > keystore.jks
           /usr/local/lib/android/sdk/build-tools/30.0.3/apksigner sign \
-            --ks keystore.jks --ks-pass pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
+            --ks keystore.jks --ks-pass "pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
             --in app/build/outputs/apk/release/app-release-unsigned.apk \
             --out app-signed.apk
         working-directory: android
