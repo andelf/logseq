@@ -90,17 +90,14 @@ jobs:
       - name: Compile CLJS
         run: yarn install && yarn release
 
-      - name: Update APP Version
-        run: |
-          sed -i 's/"version": "0.0.1"/"version": "${{ steps.ref.outputs.version }}"/g' ./package.json
-        working-directory: ./static
-
       - name: Prepare public Directory
         run: |
           cp -rv static public/
           rm -rvf public/static/js/publishing
-          rm -rvf public/static/js/main.js.map
-          rm -rvf android/app/src/main/assets/public
+          rm -rvf public/static/js/*.js.map || true
+          rm -rvf public/static/*.*
+          rm -rvf public/static/ios
+          rm -rvf android/app/src/main/assets/public || true
 
       - name: Sync public to Android Project
         run: npx cap sync
@@ -114,8 +111,17 @@ jobs:
           ./gradlew zipApksForRelease
         working-directory: android
 
+      - name: Sign Android APK
+        run: |
+          echo ${{ secret.ANDROID_KEYSTORE }} | base64 -d > keystore.jks
+          apksigner sign --ks keystore.jks \
+            --key-pass ${{ secret.ANDROID_KEYSTORE_PASSWORD }} \
+            --in app/build/outputs/apk/release/app-release-unsigned.apk \
+            --out app-signed.apk
+        working-directory: android
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
         with:
           name: logseq-android-apk
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          path: android/app-signed.apk
