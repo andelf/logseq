@@ -10,20 +10,7 @@ on:
         type: string
         required: true
         default: "beta"
-      git-ref:
-        description: "Release Git Ref(master)"
-        required: true
-        default: "master"
-      is-draft:
-        description: 'Draft Release? (Beta only, Nightly will always be a non-draft)'
-        type: boolean
-        required: true
-        default: true
-      is-pre-release:
-        description: 'Pre Release? (labeled as "PreRelease")'
-        type: boolean
-        required: true
-        default: true
+
  # schedule: # Every workday at the 2 P.M. (UTC) we run a scheduled nightly build
   #  - cron: '0 14 * * MON-FRI'
 
@@ -37,8 +24,8 @@ jobs:
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.inputs.git-ref }}
+        #with:
+        #  ref: ${{ github.event.inputs.git-ref }}
 
       - name: Install Node.js, NPM and Yarn
         uses: actions/setup-node@v2
@@ -107,6 +94,7 @@ jobs:
 
       - name: Build Android
         run: |
+          find /usr/local/lib/android/ -iname apksigner
           ./gradlew clean
           ./gradlew zipApksForRelease
         working-directory: android
