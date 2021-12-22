@@ -1,6 +1,6 @@
 # This is the main mobile application release workflow for both nightly and beta/stable releases.
 
-name: Build-Mobile-Release
+name: Build-Android
 
 on:
   workflow_dispatch:
@@ -117,7 +117,7 @@ jobs:
       - name: Rename Apk
         run: |
           mkdir builds
-          mv app-signed.apk ./builds/Logseq-android-${{ steps.ref.outputs.version }}.apk
+          mv android/app-signed.apk ./builds/Logseq-android-${{ steps.ref.outputs.version }}.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2

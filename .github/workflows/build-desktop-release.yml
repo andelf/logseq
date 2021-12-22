@@ -352,7 +352,7 @@ jobs:
 
   # reuse workflow via workflow_call
   build-android:
-    uses: andelf/logseq/.github/workflows/build-mobile-release.yml@master
+    uses: andelf/logseq/.github/workflows/build-android.yml@master
     with:
       build-target: "${{ github.event.inputs.build-target }}"
     secrets:
