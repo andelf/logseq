@@ -430,12 +430,10 @@ jobs:
             ./*.AppImage
             ./*.apk
 
-
-
   release:
     # NOTE: For now, we only have beta channel to be released on Github
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build-target != 'nightly' }}
-    needs: [ build-macos-x64, build-macos-arm64, build-linux, build-windows ]
+    needs: [ build-macos-x64, build-macos-arm64, build-linux, build-windows, build-android ]
     runs-on: ubuntu-18.04
     steps:
       - name: Download MacOS x64 Artifacts
@@ -462,6 +460,12 @@ jobs:
           name: logseq-win64-builds
           path: ./
 
+      - name: Download Android Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: logseq-android-builds
+          path: ./
+
       - name: List files
         run: ls -rl
 
@@ -476,6 +480,7 @@ jobs:
           sha256sum *-darwin-* > SHA256SUMS.txt
           sha256sum *-win-* >> SHA256SUMS.txt
           sha256sum *-linux-* >> SHA256SUMS.txt
+          sha256sum *.apk >> SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Create Release Draft
@@ -493,3 +498,4 @@ jobs:
             ./*.dmg
             ./*.exe
             ./*.AppImage
+            ./*.apk
