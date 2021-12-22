@@ -352,6 +352,11 @@ jobs:
 
   build-android:
     uses: andelf/logseq/.github/workflows/build-mobile-release.yml@master
+    with:
+      build-target: "${{ github.event.inputs.build-target }}"
+    secrets:
+      ANDROID_KEYSTORE: "${{ secrets.ANDROID_KEYSTORE }}"
+      ANDROID_KEYSTORE_PASSWORD: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
 
   nightly-release:
     if: ${{ github.event_name == 'schedule' || github.event.inputs.build-target == 'nightly' }}
