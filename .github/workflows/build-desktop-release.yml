@@ -351,7 +351,7 @@ jobs:
           path: builds
 
   build-android:
-    uses: .github/workflows/build-mobile-release.yml@master
+    uses: andelf/logseq/.github/workflows/build-mobile-release.yml@master
 
   nightly-release:
     if: ${{ github.event_name == 'schedule' || github.event.inputs.build-target == 'nightly' }}
