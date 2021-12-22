@@ -1,8 +1,10 @@
 (ns workspaces.cards
   (:require [frontend.extensions.graph :as graph]
             [frontend.ui :as ui]
+            [frontend.extensions.excalidraw :as excalidraw]
             [nubank.workspaces.card-types.react :as ct.react]
             [nubank.workspaces.core :as ws]
+            [nubank.workspaces.model :as wsm]
             [rum.core :as rum]))
 
 ;; simple function to create react elemnents
@@ -22,6 +24,14 @@
 (ws/defcard button-card
   (ct.react/react-card
    (ui-button)))
+
+(ws/defcard draw-card
+            {::wsm/card-width 20
+             ::wsm/card-height 7}
+            (ct.react/react-card
+             (excalidraw/draw-inner
+              true
+              {:file "xxxx.draw"})))
 
 (rum/defc graph
   []

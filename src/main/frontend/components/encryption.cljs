@@ -163,6 +163,7 @@
                          (when-not (string/blank? value) ; TODO: length or other checks
                            (let [repo (state/get-current-repo)]
                              (p/do!
+                              (prn :repo repo)
                               (-> (e/decrypt-with-passphrase value db-encrypted-secret)
                                   (p/then (fn [keys]
                                             (e/save-key-pair! repo keys)
@@ -175,6 +176,7 @@
 (defn encryption-input-secret-dialog
   [repo-url db-encrypted-secret close-fn]
   (fn [close-modal-fn]
+    (prn :in-dialog)
     (let [close-fn (fn [encrypted?]
                      (close-fn encrypted?)
                      (close-modal-fn))]

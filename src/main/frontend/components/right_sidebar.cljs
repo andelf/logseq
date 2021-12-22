@@ -24,7 +24,7 @@
   (when-not (util/mobile?)
     (ui/with-shortcut :ui/toggle-right-sidebar "left"
       [:a.button.fade-link.toggle
-       {:on-click state/toggle-sidebar-open?!}
+       {:on-click state/toggle-sidebar-open?! :key "toggle-btn"}
        (ui/icon "layout-sidebar-right" {:style {:fontSize "20px"}})])))
 
 (rum/defc block-cp < rum/reactive

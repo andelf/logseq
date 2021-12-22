@@ -143,7 +143,7 @@
                        {:style {:display "flex" :flex-direction "row"}}
                        [:div {:style {:margin-right "8px"}} title]])]
           (if hr
-            [:hr.my-1]
+            [:hr.my-1 {:key "hr-divider"}]
             (rum/with-key
               (menu-link new-options child)
               title))))
@@ -760,7 +760,7 @@
                              (catch js/Error e
                                (log/error :exception e)
                                [:div]))
-                           [:div {:key "tippy"} ""])))
+                           [:div])))
            child)))
 
 (defn slider

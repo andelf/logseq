@@ -16,6 +16,7 @@
     (if (s/explain-data spec value)
      (let [error-message (expound/expound-str spec value)
            ex (ex-info "Error in validate" {})]
+       (println error-message)
        (log/error :exception ex :spec/validate-failed error-message)
        false)
      true)))

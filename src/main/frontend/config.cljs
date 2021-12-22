@@ -15,6 +15,9 @@
 
 (reset! state/publishing? publishing?)
 
+(goog-define MOCK false)
+(defonce mock? ^boolean MOCK)
+
 (def test? false)
 
 ;; :TODO: How to do this?

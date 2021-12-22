@@ -79,12 +79,14 @@ jobs:
 
       - name: Prepare public Directory
         run: |
-          cp -rv static public/
+          cp -r static public/
           rm -rvf public/static/js/publishing
+          rm -rvf public/workspaces
           rm -rvf public/static/js/*.js.map || true
           rm -rvf public/static/*.*
           rm -rvf public/static/ios
           rm -rvf android/app/src/main/assets/public || true
+          tree public/
 
       - name: Sync public to Android Project
         run: npx cap sync

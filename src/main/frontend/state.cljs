@@ -190,8 +190,12 @@
 
       :srs/cards-due-count nil})))
 
+;; block uuid -> content
+(defonce editor-content (atom {}))
+
+
 ;; block uuid -> {content(String) -> ast}
-(def blocks-ast-cache (atom (cache/lru-cache-factory {} :threshold 5000)))
+(defonce blocks-ast-cache (atom (cache/lru-cache-factory {} :threshold 5000)))
 (defn add-block-ast-cache!
   [block-uuid content ast]
   (when (and block-uuid content ast)
@@ -883,6 +887,7 @@
            content (string/trim (or content ""))]
        (swap! state
               (fn [state]
+                ; (prn "set-editing!" (:editor/content state))
                 (-> state
                     (assoc-in [:editor/content edit-input-id] content)
                     (assoc

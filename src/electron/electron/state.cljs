@@ -13,6 +13,7 @@
 
 (defn set-state!
   [path value]
+  (prn :path path)
   (if (vector? path)
     (swap! state assoc-in path value)
     (swap! state assoc path value)))

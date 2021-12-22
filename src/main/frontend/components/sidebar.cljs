@@ -187,11 +187,14 @@
   [state]
   (rum/with-context [[t] i18n/*tongue-context*]
     (let [num (state/sub :srs/cards-due-count)]
-      [:a.item.group.flex.items-center.px-2.py-2.text-sm.font-medium.rounded-md {:on-click #(state/pub-event! [:modal/show-cards])}
-      (ui/icon "infinity mr-3" {:style {:font-size 20}})
-      [:span.flex-1 (t :right-side-bar/flashcards)]
-      (when (and num (not (zero? num)))
-        [:span.ml-3.inline-block.py-0.5.px-3.text-xs.font-medium.rounded-full.fade-in num])])))
+      [:a.item.group.flex.items-center.px-2.py-2.text-sm.font-medium.rounded-md
+       {:on-click #(state/pub-event! [:modal/show-cards])}
+       (ui/icon "infinity mr-3" {:style {:font-size 20}})
+       [:span.flex-1 (t :right-side-bar/flashcards)]
+       (when (and num (not (zero? num)))
+         [:span.ml-3.inline-block.py-0.5.px-3.text-xs.font-medium.rounded-full.fade-in
+          {:title "Due Count"}
+          num])])))
 
 (defn get-default-home-if-valid
   []

@@ -33,8 +33,8 @@
   (when ref
     (when-let [current (gobj/get ref "current")]
       (-> current
-         (.getBoundingClientRect)
-         (gobj/get "width")))))
+          (.getBoundingClientRect)
+          (gobj/get "width")))))
 
 (defn- update-draw-content-width
   [state]
@@ -49,11 +49,12 @@
   (rum/local true ::zen-mode?)
   (rum/local false ::view-mode?)
   (rum/local nil ::elements)
-  {:did-mount update-draw-content-width}
-  {:did-update update-draw-content-width}
+ ;; {:did-mount update-draw-content-width}
+  ;;{:did-update update-draw-content-width}
   [state data option]
   (let [current-repo (state/sub :git/current-repo)
         bounding-width (rum/react *bounding-width)
+        
         *draw-width (get state ::draw-width)
         *zen-mode? (get state ::zen-mode?)
         *view-mode? (get state ::view-mode?)
@@ -61,6 +62,7 @@
         *elements (get state ::elements)
         file (:file option)]
     (when data
+      (prn :data data)
       [:div.overflow-hidden {:on-mouse-down (fn [e] (util/stop e))}
        [:div.my-1 {:style {:font-size 10}}
         [:a.mr-2 {:on-click ui-handler/toggle-wide-mode!}
@@ -73,12 +75,17 @@
         {:on-mouse-down (fn [e]
                           (util/stop e)
                           (state/set-block-component-editing-mode! true))
-         :on-blur #(state/set-block-component-editing-mode! false)}
+         :on-blur #(state/set-block-component-editing-mode! false)
+         :style {:height (if wide-mode? 650 500) :width *draw-width}
+         }
         (excalidraw
          (merge
           {:on-change (fn [elements state]
+                        (prn :changed elements state)
+
                         (let [elements->clj (bean/->clj elements)]
-                          (when (and (seq elements->clj)
+                          (when (and false
+                                     (seq elements->clj)
                                      (not= elements @*elements))
                             (let [state (bean/->clj state)]
                               (draw/save-excalidraw!
@@ -91,14 +98,24 @@
                                    bean/->js
                                    (js/JSON.stringify)))
                               (reset! *elements elements)))))
+           ;; :on-pointer-update (fn [payload]
+           ;;                     (js/console.log "pointer update" payload))
            :zen-mode-enabled @*zen-mode?
            :view-mode-enabled @*view-mode?
-           :grid-mode-enabled false
-           :initial-data data
-           :width  @*draw-width}
-          (if wide-mode?
-            {:height 650}
-            {:height 500})))]])))
+           :grid-mode-enabled true
+           ;; :ref *el
+          ; :ref *el
+           ; :initial-data data
+           :initial-data {:elements []
+                          :appState {:gridSize 10
+                                     :scrollToContent true
+                                     :viewBackgroundColor "#fff"}}
+           :detect-scroll true
+           :handle-keyboard-globally false
+           :UIOptions {:export false
+                       :saveAsImage false
+                       :saveToActiveFile false}
+           :width  @*draw-width}))]])))
 
 (rum/defcs draw-container < rum/reactive
   {:init (fn [state]

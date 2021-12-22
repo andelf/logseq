@@ -454,6 +454,7 @@
           (t :settings-page/enable-encryption)
           enable-encryption?
           #(let [value (not enable-encryption?)]
+             (prn :fuck "clicked")
              (config-handler/set-config! :feature/enable-encryption? value))
           [:div.text-sm.opacity-50 "⚠️ This feature is experimental"]))
 
@@ -632,8 +633,8 @@
              [:span.text-sm.opacity-50.my-4
               " for version control."]]
             [:br]
-            (switch-git-auto-commit-row t)
-            (git-auto-commit-seconds t)
+            (rum/with-key (switch-git-auto-commit-row t) "git-auto-commit-toggle")
+            (rum/with-key (git-auto-commit-seconds t) "git-auto-commit-seconds")
 
             (ui/admonition
              :warning

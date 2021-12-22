@@ -6,8 +6,8 @@
             ["posthog-js" :as posthog]
             [cljs-bean.core :as bean]))
 
-(def ^:const token "qUumrWobEk2dKiKt1b32CMEZy8fgNS94rb_Bq4WutPA")
-(def ^:const masked "masked")
+(defonce token "qUumrWobEk2dKiKt1b32CMEZy8fgNS94rb_Bq4WutPA")
+(defonce masked "masked")
 
 (defn register []
   (posthog/register
