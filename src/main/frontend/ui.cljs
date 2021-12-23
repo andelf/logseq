@@ -50,6 +50,12 @@
     :else
     0))
 
+(defn reset-ios-whole-page-offset!
+  []
+  (and (util/ios?)
+       (util/safari?)
+       (js/window.scrollTo 0 0)))
+
 (defonce icon-size (if (mobile-util/is-native-platform?) 23 20))
 
 (rum/defc ls-textarea
@@ -291,6 +297,8 @@
     (when (mobile-util/native-ios?) (.add cl "is-native-ios"))
     (when (mobile-util/native-android?) (.add cl "is-native-android"))
     (when (mobile-util/native-iphone?) (.add cl "is-native-iphone"))
+    (when (mobile-util/native-iphone-without-notch?) (.add cl "is-native-iphone-without-notch"))
+    (when (mobile-util/native-ipad?) (.add cl "is-native-ipad"))
     (when (util/electron?)
       (js/window.apis.on "full-screen" #(js-invoke cl (if (= % "enter") "add" "remove") "is-fullscreen"))
       (p/then (ipc/ipc :getAppBaseInfo) #(let [{:keys [isFullScreen]} (js->clj % :keywordize-keys true)]
