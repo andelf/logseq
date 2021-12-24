@@ -3,6 +3,8 @@
 # Builder image
 FROM clojure:openjdk-11-tools-deps-1.10.1.727 as builder
 
+ARG DEBIAN_FRONTEND=noninteractive
+
 RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
     apt-get install -y nodejs
 
