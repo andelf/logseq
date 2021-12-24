@@ -1,0 +1,31 @@
+name: Build Docker
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '*.md'
+
+env:
+  CLOJURE_VERSION: '1.10.1.727'
+
+jobs:
+
+  test:
+    strategy:
+      matrix:
+        operating-system: [ubuntu-latest]
+
+    runs-on: ${{ matrix.operating-system }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          submodules: 'true'
+
+      - name: Build Docker
+        run: |
+          docker build -t logseq-webapp:latest .
+          
