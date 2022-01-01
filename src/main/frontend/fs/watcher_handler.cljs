@@ -8,6 +8,7 @@
             [frontend.handler.extract :as extract]
             [frontend.handler.file :as file-handler]
             [frontend.handler.page :as page-handler]
+            [frontend.handler.ui :as ui-handler]
             [lambdaisland.glogi :as log]
             [electron.ipc :as ipc]
             [promesa.core :as p]
@@ -57,8 +58,7 @@
                          (string/trim (or (state/get-default-journal-template) "")))
                       (= (string/trim content) "-")
                       (= (string/trim content) "*")))
-            (p/let [
-                    ;; save the previous content in a bak file to avoid data overwritten.
+            (p/let [;; save the previous content in a bak file to avoid data overwritten.
                     _ (ipc/ipc "backupDbFile" (config/get-local-dir repo) path db-content)
                     _ (file-handler/alter-file repo path content {:re-render-root? true
                                                                   :from-disk? true})]
@@ -70,6 +70,12 @@
           (when-let [page-name (db/get-file-page path)]
             (println "Delete page: " page-name ", file path: " path ".")
             (page-handler/delete! page-name #() :delete-file? false))
+
+          (and (contains? #{"add" "change" "unlink"} type)
+               (string/ends-with? path "logseq/custom.css"))
+          (do
+            (println "reloading custom.css")
+            (ui-handler/add-style-if-exists!))
 
           (contains? #{"add" "change" "unlink"} type)
           nil
