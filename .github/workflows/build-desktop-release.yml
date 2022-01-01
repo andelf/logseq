@@ -382,11 +382,11 @@ jobs:
           name: logseq-linux-builds
           path: ./
 
-      #- name: Download The Windows Artifact
-      #  uses: actions/download-artifact@v2
-      #  with:
-      #    name: logseq-win64-builds
-      #    path: ./
+      - name: Download The Windows Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: logseq-win64-builds
+          path: ./
 
       - name: Download Android Artifacts
         uses: actions/download-artifact@v2
