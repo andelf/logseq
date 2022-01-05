@@ -3,25 +3,24 @@
 changelog:
   exclude:
     labels:
-      - ci
       - test
       - chore
+      - ci
+      - :type/dev
   categories:
     - title: Exciting New Features 🎉
       labels:
-        - feat
-    - title: Breaking Changes 🛠
-      labels:
-        - breaking-change
+        - :type/feature-request
+        - :type/feature
     - title: Bug Fixes 🐛
       labels:
-        - fix
+        - :type/bug
+        - :type/bug-fix
+        - :type/regression
     - title: Enhancements 🔧
       labels:
-        - refactor
-        - perf
-        - enhancement
-        - enhance
+        - :type/enhancement
+        - :type/performance
     - title: Other Changes 🚧
       labels:
         - "*"
