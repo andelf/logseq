@@ -5,6 +5,7 @@
             [cljs.core.async :as async]
             [clojure.string :as string]
             [dommy.core :as dom]
+            [medley.core :as medley]
             [electron.ipc :as ipc]
             [frontend.storage :as storage]
             [frontend.util :as util]
@@ -58,7 +59,12 @@
       :search/graph-filters []
 
       ;; modals
-      :modal/show? false
+      :modal/label                           ""
+      :modal/show?                           false
+      :modal/panel-content                   nil
+      :modal/fullscreen?                     false
+      :modal/close-btn?                      nil
+      :modal/subsets                         []
 
       ;; right sidebar
       :ui/fullscreen? false
@@ -151,6 +157,9 @@
       :electron/user-cfgs nil
 
       ;; plugin
+      :plugin/enabled   (and (util/electron?)
+                             ;; true false :theme-only
+                             ((fnil identity true) (storage/get :lsp-core-enabled)))
       :plugin/indicator-text        nil
       :plugin/installed-plugins     {}
       :plugin/installed-themes      []
@@ -163,6 +172,8 @@
       :plugin/marketplace-stats     nil
       :plugin/installing            nil
       :plugin/active-readme         nil
+      :plugin/updates-pending       {}
+      :plugin/updates-coming        {}
 
       ;; pdf
       :pdf/current                  nil
@@ -291,13 +302,13 @@
   (:arweave/gateway (get-config) default-arweave-gateway))
 
 (defonce built-in-macros
-  {"img" "[:img.$4 {:src \"$1\" :style {:width $2 :height $3}}]"})
+         {"img" "[:img.$4 {:src \"$1\" :style {:width $2 :height $3}}]"})
 
 (defn get-macros
   []
   (merge
-   built-in-macros
-   (:macros (get-config))))
+    built-in-macros
+    (:macros (get-config))))
 
 (defn sub-config
   []
@@ -326,7 +337,7 @@
 (defn enable-grammarly?
   []
   (true? (:feature/enable-grammarly?
-          (get (sub-config) (get-current-repo)))))
+           (get (sub-config) (get-current-repo)))))
 
 ;; (defn store-block-id-in-file?
 ;;   []
@@ -335,37 +346,37 @@
 (defn scheduled-deadlines-disabled?
   []
   (true? (:feature/disable-scheduled-and-deadline-query?
-          (get (sub-config) (get-current-repo)))))
+           (get (sub-config) (get-current-repo)))))
 
 (defn enable-timetracking?
   []
   (not (false? (:feature/enable-timetracking?
-                (get (sub-config) (get-current-repo))))))
+                 (get (sub-config) (get-current-repo))))))
 
 (defn enable-journals?
   [repo]
   (not (false? (:feature/enable-journals?
-                (get (sub-config) repo)))))
+                 (get (sub-config) repo)))))
 
 (defn export-heading-to-list?
   []
   (not (false? (:export/heading-to-list?
-                (get (sub-config) (get-current-repo))))))
+                 (get (sub-config) (get-current-repo))))))
 
 (defn enable-encryption?
   [repo]
   (:feature/enable-encryption?
-   (get (sub-config) repo)))
+    (get (sub-config) repo)))
 
 (defn enable-git-auto-push?
   [repo]
   (not (false? (:git-auto-push
-                (get (sub-config) repo)))))
+                 (get (sub-config) repo)))))
 
 (defn enable-block-timestamps?
   []
   (true? (:feature/enable-block-timestamps?
-          (get (sub-config) (get-current-repo)))))
+           (get (sub-config) (get-current-repo)))))
 
 (defn sub-graph-config
   []
@@ -379,7 +390,7 @@
 (defn show-brackets?
   []
   (not (false? (:ui/show-brackets?
-                (get (sub-config) (get-current-repo))))))
+                 (get (sub-config) (get-current-repo))))))
 
 (defn get-default-home
   []
@@ -398,11 +409,11 @@
    (get-preferred-format (get-current-repo)))
   ([repo-url]
    (keyword
-    (or
-     (when-let [fmt (:preferred-format (get-config repo-url))]
-       (string/lower-case (name fmt)))
+     (or
+       (when-let [fmt (:preferred-format (get-config repo-url))]
+         (string/lower-case (name fmt)))
 
-     (get-in @state [:me :preferred_format] "markdown")))))
+       (get-in @state [:me :preferred_format] "markdown")))))
 
 ;; TODO: consider adding a pane in Settings to set this through the GUI (rather
 ;; than having to go through the config.edn file)
@@ -410,8 +421,8 @@
   ([] (get-editor-command-trigger (get-current-repo)))
   ([repo-url]
    (or
-    (:editor/command-trigger (get-config repo-url)) ;; Get from user config
-    "/"))) ;; Set the default
+     (:editor/command-trigger (get-config repo-url))        ;; Get from user config
+     "/")))                                                 ;; Set the default
 
 (defn markdown?
   []
@@ -421,16 +432,16 @@
 (defn get-pages-directory
   []
   (or
-   (when-let [repo (get-current-repo)]
-     (:pages-directory (get-config repo)))
-   "pages"))
+    (when-let [repo (get-current-repo)]
+      (:pages-directory (get-config repo)))
+    "pages"))
 
 (defn get-journals-directory
   []
   (or
-   (when-let [repo (get-current-repo)]
-     (:journals-directory (get-config repo)))
-   "journals"))
+    (when-let [repo (get-current-repo)]
+      (:journals-directory (get-config repo)))
+    "journals"))
 
 (defn org-mode-file-link?
   [repo]
@@ -444,13 +455,13 @@
 (defn get-preferred-workflow
   []
   (keyword
-   (or
-    (when-let [workflow (:preferred-workflow (get-config))]
-      (let [workflow (name workflow)]
-        (if (util/safe-re-find #"now|NOW" workflow)
-          :now
-          :todo)))
-    (get-in @state [:me :preferred_workflow] :now))))
+    (or
+      (when-let [workflow (:preferred-workflow (get-config))]
+        (let [workflow (name workflow)]
+          (if (util/safe-re-find #"now|NOW" workflow)
+            :now
+            :todo)))
+      (get-in @state [:me :preferred_workflow] :now))))
 
 (defn get-preferred-todo
   []
@@ -773,7 +784,7 @@
 (defn set-github-installation-tokens!
   [tokens]
   (when (seq tokens)
-    (let [tokens  (medley/index-by :installation_id tokens)
+    (let [tokens (medley/index-by :installation_id tokens)
           repos (get-repos)]
       (when (seq repos)
         (let [set-token-f
@@ -789,8 +800,8 @@
                       (merge repo {:token token :expires_at expires-at}))
                     (do
                       (when (and
-                             (:url repo)
-                             (string/starts-with? (:url repo) "https://"))
+                              (:url repo)
+                              (string/starts-with? (:url repo) "https://"))
                         (log/error :token/cannot-set-token {:repo-m repo :token-m m}))
                       repo))))
               repos (mapv set-token-f repos)]
@@ -818,13 +829,13 @@
   [repo db-id block-type block-data]
   (when (not (util/sm-breakpoint?))
     (when db-id
-     (update-state! :sidebar/blocks (fn [blocks]
-                                      (->> (remove #(= (second %) db-id) blocks)
-                                           (cons [repo db-id block-type block-data])
-                                           (distinct))))
-     (open-right-sidebar!)
-     (when-let [elem (gdom/getElementByClass "cp__right-sidebar-scrollable")]
-       (util/scroll-to elem 0)))))
+      (update-state! :sidebar/blocks (fn [blocks]
+                                       (->> (remove #(= (second %) db-id) blocks)
+                                            (cons [repo db-id block-type block-data])
+                                            (distinct))))
+      (open-right-sidebar!)
+      (when-let [elem (gdom/getElementByClass "cp__right-sidebar-scrollable")]
+        (util/scroll-to elem 0)))))
 
 (defn sidebar-remove-block!
   [idx]
@@ -869,8 +880,8 @@
                     (util/get-block-container block-element))]
     (when container
       {:last-edit-block edit-block
-       :container (gobj/get container "id")
-       :pos (cursor/pos (gdom/getElement edit-input-id))})))
+       :container       (gobj/get container "id")
+       :pos             (cursor/pos (gdom/getElement edit-input-id))})))
 
 (defonce publishing? (atom nil))
 
@@ -884,13 +895,13 @@
   ([edit-input-id content block cursor-range move-cursor?]
    (when (and edit-input-id block
               (or
-               (publishing-enable-editing?)
-               (not @publishing?)))
+                (publishing-enable-editing?)
+                (not @publishing?)))
      (let [block-element (gdom/getElement (string/replace edit-input-id "edit-block" "ls-block"))
            container (util/get-block-container block-element)
            block (if container
                    (assoc block
-                          :block/container (gobj/get container "id"))
+                     :block/container (gobj/get container "id"))
                    block)
            content (string/trim (or content ""))]
        (swap! state
@@ -899,12 +910,12 @@
                 (-> state
                     (assoc-in [:editor/content edit-input-id] content)
                     (assoc
-                     :editor/block block
-                     :editor/editing? {edit-input-id true}
-                     :editor/last-edit-block-input-id edit-input-id
-                     :editor/last-edit-block block
-                     :editor/last-key-code nil
-                     :cursor-range cursor-range))))
+                      :editor/block block
+                      :editor/editing? {edit-input-id true}
+                      :editor/last-edit-block-input-id edit-input-id
+                      :editor/last-edit-block block
+                      :editor/last-key-code nil
+                      :cursor-range cursor-range))))
 
        (when-let [input (gdom/getElement edit-input-id)]
          (let [pos (count cursor-range)]
@@ -924,13 +935,13 @@
 (defn clear-edit!
   []
   (swap! state merge {:editor/editing? nil
-                      :editor/block nil
-                      :cursor-range nil}))
+                      :editor/block    nil
+                      :cursor-range    nil}))
 
 (defn into-code-editor-mode!
   []
-  (swap! state merge {:editor/editing? nil
-                      :cursor-range nil
+  (swap! state merge {:editor/editing?   nil
+                      :cursor-range      nil
                       :editor/code-mode? true}))
 
 (defn set-last-pos!
@@ -1013,12 +1024,12 @@
   []
   (when (util/electron?)
     (js/window.apis.setUpdatesCallback
-     (fn [_ args]
-       (let [data (bean/->clj args)
-             pending? (not= (:type data) "completed")]
-         (set-state! :electron/updater-pending? pending?)
-         (when pending? (set-state! :electron/updater data))
-         nil)))))
+      (fn [_ args]
+        (let [data (bean/->clj args)
+              pending? (not= (:type data) "completed")]
+          (set-state! :electron/updater-pending? pending?)
+          (when pending? (set-state! :electron/updater data))
+          nil)))))
 
 (defn set-file-component!
   [component]
@@ -1072,14 +1083,14 @@
 (defn get-date-formatter
   []
   (or
-   (when-let [repo (get-current-repo)]
-     (or
-      (get-in @state [:config repo :journal/page-title-format])
-      ;; for compatibility
-      (get-in @state [:config repo :date-formatter])))
-   ;; TODO:
-   (get-in @state [:me :settings :date-formatter])
-   "MMM do, yyyy"))
+    (when-let [repo (get-current-repo)]
+      (or
+        (get-in @state [:config repo :journal/page-title-format])
+        ;; for compatibility
+        (get-in @state [:config repo :date-formatter])))
+    ;; TODO:
+    (get-in @state [:me :settings :date-formatter])
+    "MMM do, yyyy"))
 
 (defn set-git-status!
   [repo-url value]
@@ -1120,12 +1131,12 @@
 (defn get-default-branch
   [repo-url]
   (or
-   (some->> (get-repos)
-            (filter (fn [m]
-                      (= (:url m) repo-url)))
-            (first)
-            :branch)
-   "master"))
+    (some->> (get-repos)
+             (filter (fn [m]
+                       (= (:url m) repo-url)))
+             (first)
+             :branch)
+    "master"))
 
 (defn get-current-project
   []
@@ -1162,13 +1173,56 @@
   []
   (:modal/show? @state))
 
+(declare set-modal!)
+
+(defn get-sub-modals
+  []
+  (:modal/subsets @state))
+
+(defn set-sub-modal!
+  ([panel-content]
+   (set-sub-modal! panel-content
+                   {:close-btn? true}))
+  ([panel-content {:keys [id label close-btn? show? center?] :as opts}]
+   (if (not (modal-opened?))
+     (set-modal! panel-content opts)
+     (let [modals (:modal/subsets @state)
+           idx (and id (first (keep-indexed #(when (= (:modal/id %2) id) %1)
+                                            modals)))
+           input (medley/filter-vals
+                   #(not (nil? %1))
+                   {:modal/id            id
+                    :modal/label         (or label (if center? "ls-modal-align-center" ""))
+                    :modal/show?         (if (boolean? show?) show? true)
+                    :modal/panel-content panel-content
+                    :modal/close-btn?    close-btn?})]
+       (swap! state update-in
+              [:modal/subsets (or idx (count modals))]
+              merge input)
+       (:modal/subsets @state)))))
+
+(defn close-sub-modal!
+  ([] (close-sub-modal! nil))
+  ([all?-a-id]
+   (if (true? all?-a-id)
+     (swap! state assoc :modal/subsets [])
+     (let [id all?-a-id
+           modals (:modal/subsets @state)]
+       (when-let [idx (if id (first (keep-indexed #(when (= (:modal/id %2) id) %1) modals))
+                             (dec (count modals)))]
+         (swap! state assoc :modal/subsets (into [] (medley/remove-nth idx modals))))))
+   (:modal/subsets @state)))
+
 (defn set-modal!
   ([modal-panel-content]
    (set-modal! modal-panel-content
                {:fullscreen? false
                 :close-btn?  true}))
-  ([modal-panel-content {:keys [fullscreen? close-btn?]}]
+  ([modal-panel-content {:keys [label fullscreen? close-btn? center?]}]
+   (when (seq (get-sub-modals))
+     (close-sub-modal! true))
    (swap! state assoc
+          :modal/label (or label (if center? "ls-modal-align-center" ""))
           :modal/show? (boolean modal-panel-content)
           :modal/panel-content modal-panel-content
           :modal/fullscreen? fullscreen?
@@ -1176,9 +1230,13 @@
 
 (defn close-modal!
   []
-  (swap! state assoc
-         :modal/show? false
-         :modal/panel-content nil))
+  (if (seq (get-sub-modals))
+    (close-sub-modal!)
+    (swap! state assoc
+           :modal/label ""
+           :modal/show? false
+           :modal/fullscreen? false
+           :modal/panel-content nil)))
 
 (defn get-db-batch-txs-chan
   []
@@ -1383,11 +1441,11 @@
   [repo]
   (when repo
     (or
-     (when-let [last-time (get-in @state [:editor/last-input-time repo])]
-       (let [now (util/time-ms)]
-         (>= (- now last-time) 500)))
-     ;; not in editing mode
-     (not (get-edit-input-id)))))
+      (when-let [last-time (get-in @state [:editor/last-input-time repo])]
+        (let [now (util/time-ms)]
+          (>= (- now last-time) 500)))
+      ;; not in editing mode
+      (not (get-edit-input-id)))))
 
 (defn set-last-persist-transact-id!
   [repo files? id]
@@ -1488,26 +1546,26 @@
 (defn get-start-of-week
   []
   (or
-   (when-let [repo (get-current-repo)]
-     (get-in @state [:config repo :start-of-week]))
-   (get-in @state [:me :settings :start-of-week])
-   6))
+    (when-let [repo (get-current-repo)]
+      (get-in @state [:config repo :start-of-week]))
+    (get-in @state [:me :settings :start-of-week])
+    6))
 
 (defn get-ref-open-blocks-level
   []
   (or
-   (when-let [value (:ref/default-open-blocks-level (get-config))]
-     (when (integer? value)
-       value))
-   2))
+    (when-let [value (:ref/default-open-blocks-level (get-config))]
+      (when (integer? value)
+        value))
+    2))
 
 (defn get-linked-references-collapsed-threshold
   []
   (or
-   (when-let [value (:ref/linked-references-collapsed-threshold (get-config))]
-     (when (integer? value)
-       value))
-   100))
+    (when-let [value (:ref/linked-references-collapsed-threshold (get-config))]
+      (when (integer? value)
+        value))
+    100))
 
 (defn get-events-chan
   []
@@ -1562,7 +1620,7 @@
 (defn logical-outdenting?
   []
   (:editor/logical-outdenting?
-   (get (sub-config) (get-current-repo))))
+    (get (sub-config) (get-current-repo))))
 
 (defn get-editor-args
   []
@@ -1635,6 +1693,28 @@
 (defn get-visual-viewport-state
   []
   (:ui/visual-viewport-state @state))
+
+(defn get-enabled-installed-plugins
+  [theme?]
+  (filterv
+    #(and (:iir %)
+          (not (get-in % [:settings :disabled]))
+          (= (boolean theme?) (:theme %)))
+    (vals (:plugin/installed-plugins @state))))
+
+(defn lsp-enabled?-or-theme
+  []
+  (:plugin/enabled @state))
+
+(defn consume-updates-coming-plugin
+  [payload updated?]
+  (when-let [id (keyword (:id payload))]
+    (let [pending? (seq (:plugin/updates-pending @state))]
+      (swap! state update :plugin/updates-pending dissoc id)
+      (if updated?
+        (swap! state update :plugin/updates-coming dissoc id)
+        (swap! state update :plugin/updates-coming assoc id payload))
+      (pub-event! [:plugin/consume-updates id pending? updated?]))))
 
 (defn sub-right-sidebar-blocks
   []
