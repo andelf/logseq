@@ -35,8 +35,8 @@
     content
     (when (and content q)
       (let [q-words (string/split q #" ")
-            lc-content (string/lower-case content)
-            lc-q (string/lower-case q)]
+            lc-content (util/search-normalize content)
+            lc-q (util/search-normalize q)]
         (if (and (string/includes? lc-content lc-q)
                  (not (util/safe-re-find #" " q)))
           (let [i (string/index-of lc-content lc-q)
@@ -96,8 +96,8 @@
                                           {:type :page
                                            :data page}
                                           (and alias
-                                               (not= (string/lower-case page)
-                                                     (string/lower-case alias)))
+                                               (not= (util/page-name-sanity-lc page)
+                                                     (util/page-name-sanity-lc alias)))
                                           (assoc :alias alias))))
                                  (remove nil? pages)))
           files (when-not all? (map (fn [file] {:type :file :data file}) files))
@@ -105,8 +105,8 @@
           search-mode (state/sub :search/mode)
           new-page (if (or
                         (and (seq pages)
-                             (= (util/safe-lower-case search-q)
-                                (util/safe-lower-case (:data (first pages)))))
+                             (= (util/safe-page-name-sanity-lc search-q)
+                                (util/safe-page-name-sanity-lc (:data (first pages)))))
                         (nil? result)
                         all?)
                      []
@@ -159,7 +159,7 @@
                             (case type
                               :page
                               (let [data (or alias data)
-                                    page (when data (db/entity [:block/name (string/lower-case data)]))]
+                                    page (when data (db/entity [:block/name (util/page-name-sanity-lc data)]))]
                                 (when page
                                   (state/sidebar-add-block!
                                    (state/get-current-repo)
@@ -199,7 +199,9 @@
                                                   :page
                                                   [:span {:data-page-ref data}
                                                    (when alias
-                                                     [:span.mr-2.text-sm.font-medium.mb-2 (str "Alias -> " alias)])
+                                                     (let [target-entity (db/get-page alias)
+                                                           target-original-name (util/get-page-original-name target-entity)]
+                                                       [:span.mr-2.text-sm.font-medium.mb-2 (str "Alias -> " target-original-name)]))
                                                    (search-result-item "Page" (highlight-exact-query data search-q))]
 
                                                   :file
@@ -268,7 +270,7 @@
                               opts (if (= :page search-mode)
                                      (let [current-page (or (state/get-current-page)
                                                             (date/today))]
-                                       {:page-db-id (:db/id (db/entity [:block/name (string/lower-case current-page)]))})
+                                       {:page-db-id (:db/id (db/entity [:block/name (util/page-name-sanity-lc current-page)]))})
                                      {})]
                           (if (= :page search-mode)
                             (search-handler/search (state/get-current-repo) q opts)
@@ -280,7 +282,7 @@
                             :page
                             (let [page data]
                               (when (string? page)
-                                (when-let [page (db/pull [:block/name (string/lower-case page)])]
+                                (when-let [page (db/pull [:block/name (util/page-name-sanity-lc page)])]
                                  (state/sidebar-add-block!
                                   (state/get-current-repo)
                                   (:db/id page)
@@ -345,7 +347,7 @@
                                        opts (if (= :page search-mode)
                                               (when-let [current-page (or (state/get-current-page)
                                                                           (date/today))]
-                                                {:page-db-id (:db/id (db/entity [:block/name (string/lower-case current-page)]))})
+                                                {:page-db-id (:db/id (db/entity [:block/name (util/page-name-sanity-lc current-page)]))})
                                               {})]
                                    (state/set-q! value)
                                    (reset! search-timeout
