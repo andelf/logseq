@@ -4,6 +4,7 @@
   #?(:cljs (:require
             ["/frontend/selection" :as selection]
             ["/frontend/utils" :as utils]
+            ["grapheme-splitter" :as GraphemeSplitter]
             [camel-snake-kebab.core :as csk]
             [camel-snake-kebab.extras :as cske]
             [cljs-bean.core :as bean]
@@ -35,7 +36,7 @@
 
 #?(:cljs (defonce ^js node-path utils/nodePath))
 #?(:cljs (defn app-scroll-container-node []
-           (gdom/getElement "main-container")))
+           (gdom/getElement "main-content-container")))
 
 #?(:cljs
    (defn ios?
@@ -679,6 +680,38 @@
           nil)))))
 
 #?(:cljs
+   ;; for widen char
+   (defn safe-dec-current-pos-from-end
+     [input current-pos]
+     (if-let [len (and (string? input) (.-length input))]
+       (when-let [input (and (>= len 2) (<= current-pos len)
+                             (.substring input (max (- current-pos 20) 0) current-pos))]
+         (try
+           (let [^js splitter (GraphemeSplitter.)
+                 ^js input (.splitGraphemes splitter input)]
+             (- current-pos (.-length (.pop input))))
+           (catch js/Error e
+             (js/console.error e)
+             (dec current-pos))))
+       (dec current-pos))))
+
+#?(:cljs
+   ;; for widen char
+   (defn safe-inc-current-pos-from-start
+     [input current-pos]
+     (if-let [len (and (string? input) (.-length input))]
+       (when-let [input (and (>= len 2) (<= current-pos len)
+                             (.substr input current-pos 20))]
+         (try
+           (let [^js splitter (GraphemeSplitter.)
+                 ^js input (.splitGraphemes splitter input)]
+             (+ current-pos (.-length (.shift input))))
+           (catch js/Error e
+             (js/console.error e)
+             (inc current-pos))))
+       (inc current-pos))))
+
+#?(:cljs
    (defn kill-line-before!
      [input]
      (let [val (.-value input)
@@ -1143,13 +1176,18 @@
   (.normalize s "NFC"))
 
 (defn search-normalize
-  "Normalize string for searching"
+  "Normalize string for searching (loose)"
   [s]
   (.normalize (string/lower-case s) "NFKD")
 )
 
+(defn safe-search-normalize
+  [s]
+  (if (string? s)
+    (.normalize (string/lower-case s) "NFKD") s))
+
 (defn page-name-sanity
-  "Sanitize the page-name for file name"
+  "Sanitize the page-name for file name (strict)"
   ([page-name]
    (page-name-sanity page-name false))
   ([page-name replace-slash?]
