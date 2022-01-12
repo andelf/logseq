@@ -18,7 +18,7 @@ env:
 
 jobs:
 
-  test:
+  cljs-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -142,7 +142,7 @@ jobs:
 
       - name: Prepare E2E test build
         run: |
-          yarn gulp:build && clojure -M:cljs build parser-worker app publishing electron
+          yarn gulp:build && clojure -M:cljs compile parser-worker app publishing electron
           (cd static && yarn install && yarn rebuild:better-sqlite3)
 
       - name: Run Playwright test
