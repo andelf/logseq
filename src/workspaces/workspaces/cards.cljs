@@ -46,7 +46,7 @@
   (ct.react/react-card
    (graph)))
 
-(defn- random-graph
+(defn random-graph
   [n]
   (let [nodes (for [i (range 0 n)]
                 {:id (str i)
