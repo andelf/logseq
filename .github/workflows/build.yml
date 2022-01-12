@@ -75,6 +75,14 @@ jobs:
       - name: Fetch yarn deps
         run: yarn install
 
+      - name: Project shadow-cljs compiler cache
+        uses: actions/cache@v2
+        with:
+          path: .shadow-cljs
+          key: ${{ runner.os }}-shadow-cljs-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-shadow-cljs-
+
       - name: Run ClojureScript test
         run: |
           yarn cljs:test
