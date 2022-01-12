@@ -127,6 +127,8 @@ jobs:
 
       - name: Fetch yarn deps
         run: yarn install
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: true
 
       - name: Prepare E2E test build
         run: |
