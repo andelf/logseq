@@ -82,7 +82,7 @@ jobs:
 
       - name: Prepare E2E test build
         run: |
-          yarn release-app
+          yarn release
           (cd static && yarn install && yarn rebuild:better-sqlite3)
 
       - name: Run Playwright test
