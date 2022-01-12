@@ -12,6 +12,9 @@ on:
 
 env:
   CLOJURE_VERSION: '1.10.1.727'
+  JAVA_VERSION: '1.8'
+  # This is the latest node version of we can run. It's node-lts version.
+  NODE_VERSION: '16'
 
 jobs:
 
@@ -42,13 +45,12 @@ jobs:
       - name: Prepare Java
         uses: actions/setup-java@v1
         with:
-          java-version: 1.8
+          java-version: ${{ env.JAVA_VERSION }}
 
-      # This is the latest node version of we can run
       - name: Set up Node
         uses: actions/setup-node@v2
         with:
-          node-version: 16
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Clojure tools.deps
         uses: DeLaGuardo/setup-clojure@master
@@ -59,19 +61,19 @@ jobs:
         if: steps.clojure-deps.outputs.cache-hit != 'true'
         run: clojure -A:cljs -P
 
-      # - name: Get yarn cache directory path
-      #   id: yarn-cache-dir-path
-      #   run: echo "::set-output name=dir::$(yarn cache dir)"
-      # - name: yarn cache
-      #   uses: actions/cache@v2
-      #   id: yarn-cache
-      #   with:
-      #     path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-      #     key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-yarn-
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: yarn cache
+        uses: actions/cache@v2
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
       - name: Fetch yarn deps
-        run: yarn cache clean && yarn install
+        run: yarn install
 
       - name: Run ClojureScript test
         run: |
