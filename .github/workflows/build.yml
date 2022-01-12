@@ -69,7 +69,7 @@ jobs:
         id: yarn-cache
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-ci-${{ hashFiles('**/package.json') }}
+          key: ${{ runner.os }}-yarn-ci-${{ hashFiles('package.json') }}-${{ hashFiles('resources/package.json') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Fetch yarn deps
@@ -80,11 +80,13 @@ jobs:
           yarn cljs:test
           node static/tests.js
 
-      - name: Run Playwright test
+      - name: Prepare E2E test build
         run: |
-          yarn release
+          yarn release-app
           (cd static && yarn install && yarn rebuild:better-sqlite3)
-          xvfb-run -- yarn e2e-test
+
+      - name: Run Playwright test
+        run: xvfb-run -- yarn e2e-test
         env:
           DEBUG: "pw:test"
 
