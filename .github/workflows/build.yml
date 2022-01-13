@@ -57,16 +57,6 @@ jobs:
         if: steps.clojure-deps.outputs.cache-hit != 'true'
         run: clojure -A:cljs -P
 
-      - name: Shadow-cljs cache
-        uses: actions/cache@v2
-        with:
-          path: .shadow-cljs
-          # ensure update cache every time
-          key: ${{ runner.os }}-shadow-cljs-${{ github.sha }}
-          # will match most recent upload
-          restore-keys: |
-            ${{ runner.os }}-shadow-cljs-
-
       - name: Fetch yarn deps
         run: yarn install
 
@@ -131,7 +121,7 @@ jobs:
 
       - name: Prepare E2E test build
         run: |
-          yarn gulp:build && clojure -M:cljs compile parser-worker app publishing electron
+          yarn gulp:build && yarn cljs:release
           (cd static && yarn install && yarn rebuild:better-sqlite3)
 
       - name: Run Playwright test
@@ -140,7 +130,7 @@ jobs:
           DEBUG: "pw:test"
 
       - name: Save test artifacts
-        if: ${{ github.event_name == 'pull_request' && failure() }}
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v2
         with:
           name: e2e-test-report
