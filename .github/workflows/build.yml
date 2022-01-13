@@ -12,7 +12,8 @@ on:
 
 env:
   CLOJURE_VERSION: '1.10.1.727'
-  # setup-java@v2 dropped support for legacy Java syntax
+  # setup-java@v2 dropped support for legacy Java version syntax.
+  # This is the same as 1.8.
   JAVA_VERSION: '8'
   # This is the latest node version of we can run.
   NODE_VERSION: '16'
@@ -31,6 +32,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'yarn'
+          cache-dependency-path: |
+            yarn.lock
+            static/yarn.lock
 
       - name: Set up Java
         uses: actions/setup-java@v2
@@ -42,9 +46,6 @@ jobs:
         uses: DeLaGuardo/setup-clojure@master
         with:
           cli: ${{ env.CLOJURE_VERSION }}
-          cache-dependency-path: |
-            yarn.lock
-            static/yarn.lock
 
       - name: Clojure cache
         uses: actions/cache@v2
