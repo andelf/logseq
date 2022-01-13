@@ -75,7 +75,6 @@ jobs:
           yarn cljs:test
           node static/tests.js
 
-
   e2e-test:
     runs-on: ubuntu-latest
 
