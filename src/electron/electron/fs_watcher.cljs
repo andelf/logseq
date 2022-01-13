@@ -1,19 +1,15 @@
 (ns electron.fs-watcher
   (:require [cljs-bean.core :as bean]
-            ["fs" :as fs]
-            ["chokidar" :as watcher]
             [electron.utils :as utils]
-            ["electron" :refer [app]]))
+            ["fs" :as fs]
+            ["@parcel/watcher" :as watcher]))
 
-;; TODO: explore different solutions for different platforms
-;; 1. https://github.com/Axosoft/nsfw
-
-(defonce polling-interval 10000)
 (defonce file-watcher (atom nil))
 
 (defonce file-watcher-chan "file-watcher")
-(defn send-file-watcher! [^js win type payload]
+(defn- send-file-watcher! [^js win type payload]
   (when-not (.isDestroyed win)
+    (prn :sed payload)
     (.. win -webContents
         (send file-watcher-chan
               (bean/->js {:type type :payload payload})))))
@@ -28,39 +24,22 @@
 (defn watch-dir!
   [win dir]
   (when (fs/existsSync dir)
-    (let [watcher (.watch watcher dir
-                          (clj->js
-                           {:ignored (fn [path]
-                                       (utils/ignored-path? dir path))
-                            :ignoreInitial false
-                            :ignorePermissionErrors true
-                            :interval polling-interval
-                            :binaryInterval polling-interval
-                            :persistent true
-                            :disableGlobbing true
-                            :usePolling false
-                            :awaitWriteFinish true}))]
-      (reset! file-watcher watcher)
-      ;; TODO: batch sender
-      (.on watcher "add"
-           (fn [path]
-             (publish-file-event! win dir path "add")))
-      (.on watcher "change"
-           (fn [path]
-             (publish-file-event! win dir path "change")))
-      (.on watcher "unlink"
-           (fn [path]
-             (send-file-watcher! win "unlink"
-                                 {:dir (utils/fix-win-path! dir)
-                                  :path (utils/fix-win-path! path)})))
-      (.on watcher "error"
-           (fn [path]
-             (println "Watch error happened: "
-                      {:path path})))
-
-      (.on app "quit" #(.close watcher))
-
-      true)))
+    (let [subscription (.subscribe watcher dir (fn [err events]
+                                                 (if (not err)
+                                                   (->> events
+                                                        (filter #(not (utils/ignored-path? dir (.-path %))))
+                                                        (map #(let [type (.-type %)
+                                                                    path (.-path %)]
+                                                                (case type
+                                                                  "create" (publish-file-event! win dir path "add")
+                                                                  "update" (publish-file-event! win dir path "change")
+                                                                  "delete" (send-file-watcher! win "unlink"
+                                                                                               {:dir (utils/fix-win-path! dir)
+                                                                                                :path (utils/fix-win-path! path)})
+                                                                  (js/console.error "unknown watcher event:" %))))
+                                                        doall)
+                                                   (js/console.error err)))
+                                   (clj->js {:ignore [".git", "logseq/bak"]}))])))
 
 (defn close-watcher!
   []
