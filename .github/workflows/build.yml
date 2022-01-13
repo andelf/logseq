@@ -37,7 +37,6 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: ${{ env.JAVA_VERSION }}
-          cache: 'maven'
 
       - name: Set up Clojure
         uses: DeLaGuardo/setup-clojure@master
@@ -52,6 +51,7 @@ jobs:
         id: clojure-deps
         with:
           path: |
+            ~/.m2/repository
             ~/.gitlibs
           key: ${{ runner.os }}-clojure-deps-${{ hashFiles('deps.edn') }}
           restore-keys: ${{ runner.os }}-clojure-deps-
@@ -88,7 +88,6 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: ${{ env.JAVA_VERSION }}
-          cache: 'maven'
 
       - name: Set up Clojure
         uses: DeLaGuardo/setup-clojure@master
@@ -100,6 +99,7 @@ jobs:
         id: clojure-deps
         with:
           path: |
+            ~/.m2/repository
             ~/.gitlibs
           key: ${{ runner.os }}-clojure-deps-${{ hashFiles('deps.edn') }}
           restore-keys: ${{ runner.os }}-clojure-deps-
