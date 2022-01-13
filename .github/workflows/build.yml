@@ -12,7 +12,8 @@ on:
 
 env:
   CLOJURE_VERSION: '1.10.1.727'
-  JAVA_VERSION: '1.8'
+  # setup-java@v2 dropped support for legacy Java syntax
+  JAVA_VERSION: '8'
   # This is the latest node version of we can run.
   NODE_VERSION: '16'
 
