@@ -189,17 +189,11 @@
 
       (.on app "window-all-closed" (fn []
                                      (try
-                                       (fs-watcher/close-watcher!)
+                                       (fs-watcher/close-all-watcher!)
                                        (search/close!)
                                        (catch js/Error e
                                          (js/console.error e)))
                                      (.quit app)))
-      (-> (.whenReady app)
-          (p/then #(doto (.-defaultSession session)
-                     (.loadExtension 
-                      "/Users/mono/Repos/logseq/Extensions/react-dev-tools"
-                      (clj->js {:allowFileAccess true})))))
-      
       (.on app "ready"
            (fn []
              (let [t0 (setup-interceptor!)

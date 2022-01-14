@@ -1,13 +1,14 @@
 (ns electron.configs
   (:require
-    ["fs-extra" :as ^js fs]
-    ["path" :as ^js path]
-    ["electron" :refer [^js app] :as electron]
-    [cljs.reader :as reader]))
+   ["fs-extra" :as ^js fs]
+   ["path" :as ^js path]
+   ["electron" :refer [^js app] :as electron]
+   [cljs.reader :as reader]))
 
 (defonce dot-root (.join path (.getPath app "home") ".logseq"))
 (defonce cfg-root (.getPath app "userData"))
 (defonce cfg-path (.join path cfg-root "configs.edn"))
+(defonce watcher-snapshot-root (path/join cfg-root "fs-watcher"))
 
 (defn- ensure-cfg
   []
