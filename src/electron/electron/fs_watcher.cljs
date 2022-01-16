@@ -1,19 +1,22 @@
 (ns electron.fs-watcher
-  (:require [cljs-bean.core :as bean]
+  (:require [cljs-bean.core :refer [->js]]
             [electron.utils :as utils]
             [electron.configs :as configs]
             [clojure.string :as string]
             [promesa.core :as p]
             ["fs-extra" :as fse]
-            ["fs" :as fs]
+            ["fs/promises" :as fs]
             ["path" :as path]
             ["@parcel/watcher" :as watcher]))
 
 (defonce watcher-cache-path configs/watcher-snapshot-root)
 
-;; window -> current subscription
+(defonce watcher-options #js {:ignore [".git", "logseq/bak", ".DS_Store", "logseq/.recycle"]})
+
+;; window-id -> current subscription
 (defonce window-subscriptions (atom {}))
-(defonce window-graph-path (atom {}))
+;; window-id -> current path
+(defonce window-graph-paths (atom {}))
 
 ;; https://github.com/parshap/node-sanitize-filename/blob/master/index.js
 ;; Illegal Characters on Various Operating Systems
@@ -44,70 +47,98 @@
     (path/join watcher-cache-path snapshot-name)))
 
 (defonce file-watcher-chan "file-watcher")
+
 (defn- send-file-watcher! [^js win type payload]
   (when-not (.isDestroyed win)
     (prn :send payload)
     (.. win -webContents
         (send file-watcher-chan
-              (bean/->js {:type type :payload payload})))))
+              (->js {:type type :payload payload})))))
 
-(defn- safe-statSync
+(defn- stat-async
   [path]
-  (try
-    (fs/statSync path)
-    (catch js/Object e
-      (.log js/console e))))
+  (-> (fs/stat path)
+      (p/catch #(identity nil))))
+
+
+(defn- read-file-async
+  [path]
+  (-> (fs/readFile path)
+      (p/then #(.toString %))
+      (p/catch (fn [error]
+                 (js/console.error "Error reading file: " path error)))))
+
+
 
 (defn- publish-file-event!
   [win dir path event]
-  (send-file-watcher! win event {:dir (utils/fix-win-path! dir)
-                                 :path (utils/fix-win-path! path)
-                                 :content (utils/read-file path)
-                                 :stat nil }))
-                                ;; (safe-statSync path)}))
+  (p/let [stat (stat-async path)
+          content (when (and stat (.isFile stat))
+                    (read-file-async path))]
+    (send-file-watcher! win event
+                        {:dir (utils/fix-win-path! dir)
+                         :path (utils/fix-win-path! path)
+                         :content content
+                         :stat stat})))
 
 (defn watch-dir!
   [win dir]
-  (when (fs/existsSync dir)
-
+  (when (fse/pathExistsSync dir)
     (p/let [watcher-snapshot (graph-path->fs-watcher-snapshot-path dir)
             _ (prn :snapshot watcher-snapshot)
+            stat (stat-async watcher-snapshot)
+            first-time? (not stat)
             _ (fse/ensureFile watcher-snapshot)
             events-callback (fn [^js events]
-                              (doseq [event (->> events
-                                                 (filter #(not (utils/ignored-path? dir (.-path %)))))]
-                                (let [type (.-type event)
-                                      path (.-path event)]
-                                  (prn :path path)
-                                  (case type
-                                    "create" (publish-file-event! win dir path "add")
-                                    "update" (publish-file-event! win dir path "change")
-                                    "delete" (send-file-watcher! win "unlink"
-                                                                 {:dir (utils/fix-win-path! dir)
-                                                                  :path (utils/fix-win-path! path)})
-                                    (js/console.error "unknown watcher event:" event)))))
-            opts (clj->js {:ignore [".git", "logseq/bak"]})
-            old-events (watcher/getEventsSince dir watcher-snapshot opts)
+                              (->> events
+                                   (filter #(not (utils/ignored-path? dir (.-path %))))
+                                   (map #(let [type (.-type %)
+                                               path (.-path %)]
+                                           (prn :path path :type type)
+                                           (case type
+                                             "create" (publish-file-event! win dir path "add")
+                                             "update" (publish-file-event! win dir path "change")
+                                             "delete" (send-file-watcher! win "unlink"
+                                                                          {:dir (utils/fix-win-path! dir)
+                                                                           :path (utils/fix-win-path! path)})
+                                             (js/console.error "unknown watcher event:" %))))
+                                   p/all))
+            old-events (watcher/getEventsSince dir watcher-snapshot watcher-options)
             _ (events-callback old-events)
-            subscription (watcher/subscribe dir (fn [err events]
-                                                  (if (not err)
-                                                    (events-callback events)
-                                                    (js/console.error err)))
-                                            opts)]
-      (swap! window-subscriptions assoc win subscription)
-      (swap! window-graph-path assoc win dir))))
+            win-id (.-id win)
+            subscription (watcher/subscribe dir
+                                            (fn [^js err events]
+                                              (if (not err)
+                                                (events-callback events)
+                                                (js/console.error err)))
+                                            watcher-options)
+            _ (when first-time?
+                (watcher/writeSnapshot dir watcher-snapshot watcher-options))]
+      (swap! window-subscriptions assoc win-id subscription)
+      (swap! window-graph-paths assoc win-id dir))))
+
+(defn- close-watcher-inner!
+  [win-id]
+  (when-let [sub (get @window-subscriptions win-id)]
+    (.. sub -unsubscribe)
+    (swap! window-subscriptions dissoc win-id))
+  (when-let [dir (get @window-graph-paths win-id)]
+    (let [watcher-snapshot (graph-path->fs-watcher-snapshot-path dir)]
+      (watcher/writeSnapshot dir watcher-snapshot watcher-options)
+      (swap! window-graph-paths dissoc win-id))))
 
 (defn close-watcher!
   [win]
-  (when-let [sub (get @window-subscriptions win)]
-    (.. sub -unsubscribe)
-    (swap! window-subscriptions dissoc win))
-  (when-let [dir (get @window-graph-path win)]
-    (.writeSnapshot watcher dir)
-    (swap! window-graph-path dissoc win)))
+  (close-watcher-inner! (.-id win)))
+
 
 (defn close-all-watcher!
   []
   (doall (map #(.. % -unsubscribe) (vals @window-subscriptions)))
-  (swap! window-subscriptions empty))
+  (->> (vals @window-graph-paths)
+       distinct
+       (map #(let [watcher-snapshot (graph-path->fs-watcher-snapshot-path %)]
+               (watcher/writeSnapshot % watcher-snapshot watcher-options))))
+  (swap! window-subscriptions empty)
+  (swap! window-graph-paths empty))
 
