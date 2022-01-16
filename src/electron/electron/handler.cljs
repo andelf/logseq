@@ -265,7 +265,7 @@
   (search/ensure-search-dir!))
 
 (defmethod handle :addDirWatcher [window [_ dir]]
-  (watcher/close-watcher!)
+  (watcher/close-watcher! window)
   (when dir
     (watcher/watch-dir! window dir)))
 
