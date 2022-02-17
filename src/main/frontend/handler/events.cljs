@@ -82,6 +82,12 @@
   (search-handler/rebuild-indices!)
   (db/persist! repo))
 
+(defn- file-sync-stop-when-switch-graph []
+  (p/do! (persist-var/load-vars)
+         (sync/sync-stop)
+         ;; trigger rerender file-sync-header
+         (state/set-file-sync-state nil)))
+
 (defn- graph-switch [graph]
   (repo-handler/push-if-auto-enabled! (state/get-current-repo))
   (state/set-current-repo! graph)
@@ -94,11 +100,10 @@
     (fs/watch-dir! dir-name))
   (srs/update-cards-due-count!)
   (state/pub-event! [:graph/ready graph])
-  ;; load persist-vars
-  (persist-var/load-vars)
 
-  ;; stop sync
-  (sync/sync-stop))
+  (file-sync-stop-when-switch-graph))
+
+
 
 (def persist-db-noti-m
   {:before     #(notification/show!
@@ -119,6 +124,7 @@
     (graph-switch graph)))
 
 (defmethod handle :graph/switch [[_ graph]]
+  (file-sync-stop-when-switch-graph)
   (if (outliner-file/writes-finished?)
     (if (util/electron?)
       (graph-switch-on-persisted graph)
