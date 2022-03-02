@@ -16,6 +16,20 @@
     []
     (.ensureDocuments mobile-util/ios-file-container)))
 
+(when (mobile-util/native-ios?)
+  ;; FIXME: circular reference of
+  ;; frontend.fs.watcher-handler/handle-changed!
+  (p/do!
+   (.removeAllListeners mobile-util/fs-watcher)
+   (.addListener mobile-util/fs-watcher "watcher"
+                 (fn [^js event]
+                   #_:clj-kondo/ignore
+                   (frontend.fs.watcher-handler/handle-changed!
+                    (.-event event)
+                    (update (js->clj event :keywordize-keys true)
+                            :path
+                            js/decodeURI))))))
+
 (defn check-permission-android []
   (p/let [permission (.checkPermissions Filesystem)
           permission (-> permission

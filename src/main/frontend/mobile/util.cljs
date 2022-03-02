@@ -24,21 +24,9 @@
 (defonce folder-picker (registerPlugin "FolderPicker"))
 (when (native-ios?)
   (defonce download-icloud-files (registerPlugin "DownloadiCloudFiles"))
-  (defonce ios-file-container (registerPlugin "FileContainer"))
-  )
-
+  (defonce ios-file-container (registerPlugin "FileContainer")))
 (when (native-ios?)
-  (defonce fs-watcher (registerPlugin "FsWatcher"))
-  ;; FIXME: circular reference of
-  ;; frontend.fs.watcher-handler/handle-changed!
-  (p/do!
-   (.removeAllListeners fs-watcher)
-   (.addListener fs-watcher "watcher"
-                 (fn [^js event]
-                   #_:clj-kondo/ignore
-                   (frontend.fs.watcher-handler/handle-changed!
-                    (.-event event)
-                    (js->clj event :keywordize-keys true))))))
+  (defonce fs-watcher (registerPlugin "FsWatcher")))
 
 (defn sync-icloud-repo [repo-dir]
   (let [repo-name (-> (string/split repo-dir "Documents/")
