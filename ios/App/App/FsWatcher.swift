@@ -45,13 +45,8 @@ public class FsWatcher: CAPPlugin, PollingWatcherDelegate {
     }
     
     public func recevedNotification(_ url: URL, _ event: PollingWatcherEvent, _ metadata: SimpleFileMetadata?) {
-        // print("debug watcher \(event) \(url) ")
-        let allowedPathExtensions: Set = ["md", "markdown", "org", "css", "edn", "excalidraw"]
-        if !allowedPathExtensions.contains(url.pathExtension.lowercased()) {
-            return
-        }
+        // NOTE: Event in js {dir path content stat{mtime}}
         switch event {
-            // NOTE: Event in js {dir path content stat{mtime}}
         case .Unlink:
             self.notifyListeners("watcher", data: ["event": "unlink",
                                                    "dir": baseUrl?.description as Any,
@@ -81,6 +76,19 @@ public class FsWatcher: CAPPlugin, PollingWatcherDelegate {
     }
 }
 
+// MARK: URL extension
+
+extension URL {
+    func isSkipped() -> Bool {
+        let allowedPathExtensions: Set = ["md", "markdown", "org", "css", "edn", "excalidraw"]
+        if allowedPathExtensions.contains(self.pathExtension.lowercased()) {
+            return false
+        }
+        // skip for other file types
+        return true
+    }
+}
+
 // MARK: PollingWatcher
 
 public protocol PollingWatcherDelegate {
@@ -99,6 +107,21 @@ public struct SimpleFileMetadata: CustomStringConvertible, Equatable {
     var creationTimestamp: Double
     var fileSize: Int
     
+    public init?(of fileURL: URL) {
+        do {
+            let fileAttributes = try fileURL.resourceValues(forKeys:[.isRegularFileKey, .fileSizeKey, .contentModificationDateKey, .creationDateKey])
+            if fileAttributes.isRegularFile! {
+                contentModificationTimestamp = fileAttributes.contentModificationDate?.timeIntervalSince1970 ?? 0.0
+                creationTimestamp = fileAttributes.creationDate?.timeIntervalSince1970 ?? 0.0
+                fileSize = fileAttributes.fileSize ?? 0
+            } else {
+                return nil
+            }
+        } catch {
+            return nil
+        }
+    }
+    
     public var description: String {
         return "Meta(size=\(self.fileSize), mtime=\(self.contentModificationTimestamp), ctime=\(self.creationTimestamp)"
     }
@@ -106,20 +129,21 @@ public struct SimpleFileMetadata: CustomStringConvertible, Equatable {
 
 public class PollingWatcher {
     private let url: URL
+    private var timer: DispatchSourceTimer?
     public var delegate: PollingWatcherDelegate? = nil
     private var metaDb: [URL: SimpleFileMetadata] = [:]
-    private var timer: DispatchSourceTimer?
     
     public init?(at: URL) {
-        self.url = at
+        url = at
         
         let queue = DispatchQueue(label: Bundle.main.bundleIdentifier! + ".timer")
         timer = DispatchSource.makeTimerSource(queue: queue)
-        timer!.schedule(deadline: .now(), repeating: .seconds(2))
-        timer!.setEventHandler { [weak self] in
+        timer!.setEventHandler(qos: .background, flags: []) { [weak self] in
             self?.tick()
         }
+        timer!.schedule(deadline: .now())
         timer!.resume()
+        
     }
     
     deinit {
@@ -132,6 +156,8 @@ public class PollingWatcher {
     }
     
     private func tick() {
+        let startTime = DispatchTime.now()
+        
         if let enumerator = FileManager.default.enumerator(
             at: url,
             includingPropertiesForKeys: [.isRegularFileKey],
@@ -140,21 +166,25 @@ public class PollingWatcher {
             var newMetaDb: [URL: SimpleFileMetadata] = [:]
             
             for case let fileURL as URL in enumerator {
-                do {
-                    let fileAttributes = try fileURL.resourceValues(forKeys:[.isRegularFileKey, .fileSizeKey, .contentModificationDateKey, .creationDateKey])
-                    if fileAttributes.isRegularFile! {
-                        let meta = SimpleFileMetadata(
-                            contentModificationTimestamp: fileAttributes.contentModificationDate?.timeIntervalSince1970 ?? 0.0,
-                            creationTimestamp: fileAttributes.creationDate?.timeIntervalSince1970 ?? 0.0,
-                            fileSize: fileAttributes.fileSize ?? 0)
+                if !fileURL.isSkipped() {
+                    if let meta = SimpleFileMetadata(of: fileURL) {
                         newMetaDb[fileURL] = meta
                     }
-                } catch {
-                    // TODO: handle error?
                 }
             }
             
             self.updateMetaDb(with: newMetaDb)
+        }
+        
+        let elapsedNanoseconds = DispatchTime.now().uptimeNanoseconds - startTime.uptimeNanoseconds
+        let elapsedInMs = Double(elapsedNanoseconds) / 1_000_000
+        print("debug ticker elapsed=\(elapsedInMs)ms")
+        
+        if #available(iOS 13.0, *) {
+            timer!.schedule(deadline: .now().advanced(by: .seconds(2)), leeway: .milliseconds(100))
+        } else {
+            // Fallback on earlier versions
+            timer!.schedule(deadline: .now() + 2.0, leeway: .milliseconds(100))
         }
     }
     

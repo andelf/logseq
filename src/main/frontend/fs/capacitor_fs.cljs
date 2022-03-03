@@ -20,7 +20,6 @@
   ;; FIXME: circular reference of
   ;; frontend.fs.watcher-handler/handle-changed!
   (p/do!
-   (.removeAllListeners mobile-util/fs-watcher)
    (.addListener mobile-util/fs-watcher "watcher"
                  (fn [^js event]
                    #_:clj-kondo/ignore
