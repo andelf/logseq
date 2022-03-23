@@ -370,8 +370,8 @@
          ;; (and (not logged?) (seq latest-journals))
          ;; (journal/journals latest-journals)
 
-       (and logged? (not preferred-format))
-       (widgets/choose-preferred-format)
+       ;; (and logged? (not preferred-format))
+       ;; (widgets/choose-preferred-format)
 
                          ;; TODO: delay this
          ;; (and logged? (nil? (:email me)))
