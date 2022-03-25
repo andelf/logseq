@@ -16,7 +16,7 @@
 		"scheme": "Logseq"
 	},
 	"server": {
-		"url": "http://192.168.1.59:3001",
+		"url": "http://10.233.233.114:3001",
 		"cleartext": true
 	}
 }
