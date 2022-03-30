@@ -2903,7 +2903,7 @@
                                (load-more-blocks! config flat-blocks)))
             has-more? (and
                        (> (count flat-blocks) model/initial-blocks-length)
-                       (some? (model/get-next-open-block (last flat-blocks) db-id)))
+                       (some? (model/get-next-open-block (db/get-conn) (last flat-blocks) db-id)))
             dom-id (str "lazy-blocks-" (::id state))]
         [:div {:id dom-id}
          (ui/infinite-list
