@@ -106,7 +106,6 @@ test('delete and backspace', async ({ page }) => {
   await createRandomPage(page)
 
   await page.fill('textarea >> nth=0', 'test')
-
   expect(await page.inputValue('textarea >> nth=0')).toBe('test')
 
   // backspace
