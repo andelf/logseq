@@ -32,6 +32,7 @@ base.beforeAll(async () => {
     return
   }
 
+  console.log(`Creating test graph directory: ${graphDir}`)
   fs.mkdirSync(graphDir, {
     recursive: true,
   });
@@ -60,15 +61,15 @@ base.beforeAll(async () => {
   // Direct Electron console to watcher
   page.on('console', consoleLogWatcher)
   page.on('crash', () => {
-    expect('page must not crash!').toBe('page crashed')
+    expect(false, "Page must not crash").toBeTruthy()
   })
   page.on('pageerror', (err) => {
     console.log(err)
-    expect('page must not have errors!').toBe('page has some error')
+    expect(false, 'Page must not have errors!').toBeTruthy()
   })
 
   await page.waitForLoadState('domcontentloaded')
-  await page.waitForFunction('window.document.title != "Loading"')
+  // await page.waitForFunction(() => window.document.title != "Loading")
   // NOTE: The following ensures first start.
   // await page.waitForSelector('text=This is a demo graph, changes will not be saved until you open a local folder')
 
@@ -100,7 +101,7 @@ base.afterAll(async () => {
 })
 
 // hijack electron app into the test context
-export const test = base.extend<{ page: Page, context: BrowserContext, app: ElectronApplication }>({
+export const test = base.extend<{ page: Page, context: BrowserContext, app: ElectronApplication, graphDir: string }>({
   page: async ({ }, use) => {
     await use(page);
   },
@@ -109,5 +110,8 @@ export const test = base.extend<{ page: Page, context: BrowserContext, app: Elec
   },
   app: async ({ }, use) => {
     await use(electronApp);
-  }
+  },
+  graphDir: async ({ }, use) => {
+    await use(graphDir);
+  },
 });
