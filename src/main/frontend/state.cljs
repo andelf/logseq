@@ -865,7 +865,8 @@
   []
   (swap! state merge {:editor/editing? nil
                       :editor/block    nil
-                      :cursor-range    nil}))
+                      :cursor-range    nil
+                      :editor/last-saved-cursor nil}))
 
 (defn into-code-editor-mode!
   []
