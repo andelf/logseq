@@ -1258,8 +1258,23 @@
 
 (defn on-select-block
   [direction]
-  (fn [_event]
+  (fn [event]
     (cond
+      ;; when editing and selection is not full, fallback to system default handler
+      (and (state/editing?)
+           (instance? js/HTMLTextAreaElement (.-target event)))
+      (let [elem (.-target event)
+            sel-start (.-selectionStart elem)
+            sel-end (.-selectionEnd elem)
+            value-lenth (count (.-value elem))
+            multi-line? (= (string/ends-with? (.-value elem) "\n"))]
+        (if (or (and (= direction :down)
+                     (< sel-end (if multi-line? (dec value-lenth) value-lenth)))
+                (and (= direction :up)
+                     (> sel-start 0)))
+          nil
+          (state/exit-editing-and-set-selected-blocks! [(gdom/getElement (state/get-editing-block-dom-id))])))
+
       ;; when editing, quit editing and select current block
       (state/editing?)
       (state/exit-editing-and-set-selected-blocks! [(gdom/getElement (state/get-editing-block-dom-id))])
