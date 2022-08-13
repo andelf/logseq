@@ -415,7 +415,7 @@ jobs:
     if: ${{ github.event_name == 'schedule' || github.event.inputs.build-android == 'true' }}
     with:
       build-target: "${{ github.event.inputs.build-target }}"
-      enable-file-sync: "${{ github.event.inputs.enable-file-sync }}"
+      enable-file-sync: "${{ github.event.inputs.enable-file-sync == 'true' }}"
     secrets:
       ANDROID_KEYSTORE: "${{ secrets.ANDROID_KEYSTORE }}"
       ANDROID_KEYSTORE_PASSWORD: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
