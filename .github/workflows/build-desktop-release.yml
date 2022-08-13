@@ -405,7 +405,7 @@ jobs:
 
   # reuse workflow via workflow_call
   build-android:
-    uses: ${{ github.repository }}/.github/workflows/build-android.yml@master
+    uses: ./.github/workflows/build-android.yml
     if: ${{ github.event_name == 'schedule' || github.event.inputs.build-android == 'true' }}
     with:
       build-target: "${{ github.event.inputs.build-target }}"
