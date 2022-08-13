@@ -11,7 +11,7 @@ module.exports = {
         "schemes":"logseq"
       }
     ],
-    osxSign: {
+    /*osxSign: {
       identity: 'Developer ID Application: Tiansheng Qin',
       'hardened-runtime': true,
       entitlements: 'entitlements.plist',
@@ -22,7 +22,7 @@ module.exports = {
       appleId: process.env['APPLE_ID'],
       appleIdPassword: process.env['APPLE_ID_PASSWORD'],
       ascProvider: process.env['APPLE_ASC_PROVIDER']
-    },
+    },*/
   },
   makers: [
     {
