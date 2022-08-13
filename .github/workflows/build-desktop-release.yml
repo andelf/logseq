@@ -110,7 +110,7 @@ jobs:
       - name: Do Not Overwrite Existing Release
         if: ${{ github.event.inputs.build-target == 'beta' }}
         run:
-          curl -f "https://api.github.com/repos/${{ github.repository }}/releases/tag/${{ steps.ref.outputs.version }}" || exit -1
+          curl -f "https://api.github.com/repos/${{ github.repository }}/releases/tag/${{ steps.ref.outputs.version }}" && exit 1
 
       - name: Update Nightly APP Version
         if: ${{ github.event.inputs.build-target == 'nightly' || github.event_name == 'schedule' }}
@@ -405,6 +405,7 @@ jobs:
 
   # reuse workflow via workflow_call
   build-android:
+    needs: [ compile-cljs ]
     uses: ./.github/workflows/build-android.yml
     if: ${{ github.event_name == 'schedule' || github.event.inputs.build-android == 'true' }}
     with:
