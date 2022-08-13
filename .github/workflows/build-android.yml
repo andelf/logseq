@@ -109,7 +109,7 @@ jobs:
         run: yarn install && yarn release-android-app
 
       - name: Upload Sentry Sourcemaps (beta only)
-        if: ${{ inputs.build-target == 'beta' || github.event.inputs.build-target == 'beta' }}
+        if: ${{ github.repository == 'logseq/logseq' && inputs.build-target == 'beta' || github.event.inputs.build-target == 'beta' }}
         run: |
           curl -sL https://sentry.io/get-cli/ | bash
           release_name="logseq-android@${{ steps.ref.outputs.version }}"

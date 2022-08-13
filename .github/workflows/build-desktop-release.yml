@@ -110,7 +110,7 @@ jobs:
       - name: Do Not Overwrite Existing Release
         if: ${{ github.event.inputs.build-target == 'beta' }}
         run: |
-          if curl -f "https://api.github.com/repos/${{ github.repository }}/releases/tag/${{ steps.ref.outputs.version }}"; then
+          if curl -f "https://api.github.com/repos/${{ github.repository }}/releases/tag/${{ steps.ref.outputs.version }}" 2>/dev/null; then
             echo "::error Release already exists"
             exit 1
           fi
@@ -147,7 +147,7 @@ jobs:
         working-directory: ./static
 
       - name: Upload Sentry Sourcemaps (beta only)
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build-target == 'beta' }}
+        if: ${{ github.repository == 'logseq/logseq' && github.event_name == 'workflow_dispatch' && github.event.inputs.build-target == 'beta' }}
         run: |
           curl -sL https://sentry.io/get-cli/ | bash
           release_name="logseq@${{ steps.ref.outputs.version }}"
