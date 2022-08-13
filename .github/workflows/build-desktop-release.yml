@@ -111,7 +111,7 @@ jobs:
         if: ${{ github.event.inputs.build-target == 'beta' }}
         run: |
           if curl -f "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.ref.outputs.version }}" &>/dev/null; then
-            echo "::error Release already exists"
+            echo "::error title=CheckFail::Release already exists"
             exit 1
           fi
 
