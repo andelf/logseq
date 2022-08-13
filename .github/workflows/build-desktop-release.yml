@@ -38,6 +38,11 @@ on:
         type: boolean
         required: true
         default: true
+      build-android:
+        description: 'Build Android App'
+        type: boolean
+        required: true
+        default: true
   schedule: # Every workday at the 2 P.M. (UTC) we run a scheduled nightly build
     - cron: '0 14 * * MON-FRI'
 
@@ -49,6 +54,12 @@ jobs:
   compile-cljs:
     runs-on: ubuntu-18.04
     steps:
+      - name: Check build options
+        if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.build-target == 'nightly' || github.event.inputs.build-target == 'beta') && github.event.inputs.git-ref != 'master' }}
+        run: |
+          echo "::error Nightly and Beta builds must be from master"
+          exit 1
+
       - name: Check out Git repository
         uses: actions/checkout@v2
         with:
@@ -95,6 +106,11 @@ jobs:
         run: |
           pkgver=$(node ./scripts/get-pkg-version.js "${{ github.event.inputs.build-target }}")
           echo ::set-output name=version::$pkgver
+
+      - name: Do Not Overwrite Existing Release
+        if: ${{ github.event.inputs.build-target == 'beta' }}
+        run:
+          curl -f "https://api.github.com/repos/${{ github.repository }}/releases/tag/${{ steps.ref.outputs.version }}" || exit -1
 
       - name: Update Nightly APP Version
         if: ${{ github.event.inputs.build-target == 'nightly' || github.event_name == 'schedule' }}
@@ -390,8 +406,10 @@ jobs:
   # reuse workflow via workflow_call
   build-android:
     uses: logseq/logseq/.github/workflows/build-android.yml@master
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.build-android == 'true' }}
     with:
       build-target: "${{ github.event.inputs.build-target }}"
+      enable-file-sync: "${{ github.event.inputs.enable-file-sync }}"
     secrets:
       ANDROID_KEYSTORE: "${{ secrets.ANDROID_KEYSTORE }}"
       ANDROID_KEYSTORE_PASSWORD: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
@@ -495,6 +513,7 @@ jobs:
 
       - name: Download Android Artifacts
         uses: actions/download-artifact@v2
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.build-android == 'true' }}
         with:
           name: logseq-android-builds
           path: ./
