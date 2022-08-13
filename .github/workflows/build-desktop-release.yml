@@ -110,7 +110,7 @@ jobs:
       - name: Do Not Overwrite Existing Release
         if: ${{ github.event.inputs.build-target == 'beta' }}
         run: |
-          if curl -f "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.ref.outputs.version }}"; then
+          if curl -f "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.ref.outputs.version }}" 2>/dev/null; then
             echo "::error Release already exists"
             exit 1
           fi
@@ -491,7 +491,7 @@ jobs:
     # NOTE: For now, we only have beta channel to be released on Github
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build-target == 'beta' }}
     needs: [ build-macos-x64, build-macos-arm64, build-linux, build-windows, build-android ]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - name: Download MacOS x64 Artifacts
         uses: actions/download-artifact@v2
