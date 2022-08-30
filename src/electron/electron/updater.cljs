@@ -1,5 +1,5 @@
 (ns electron.updater
-  (:require [electron.utils :refer [mac? prod? open fetch logger *win]]
+  (:require [electron.utils :refer [mac? win32? prod? open fetch logger *win]]
             [frontend.version :refer [version]]
             [clojure.string :as string]
             [promesa.core :as p]
@@ -30,8 +30,7 @@
 
 (defn get-latest-artifact-info
   [repo]
-  (let [;endpoint "https://update.electronjs.org/xyhp915/cljs-todo/darwin-x64/0.0.4"
-        endpoint (str "https://update.electronjs.org/" repo "/" js/process.platform "-" js/process.arch "/" electron-version)]
+  (let [endpoint (str "https://update.electronjs.org/" repo "/" js/process.platform "-" js/process.arch "/" electron-version)]
     (debug "checking" endpoint)
     (p/catch
      (p/let [res (fetch endpoint)
@@ -45,7 +44,7 @@
        (.warn logger (str "[update server error] " e))
        (throw e)))))
 
-(defn check-for-updates
+(comment defn check-for-updates
   [{:keys           [repo ^js win]
     [auto-download] :args}]
   (let [emit (fn [type payload]
@@ -110,7 +109,7 @@
              (fn []
                (emit "completed" nil))))))))
 
-(defn- new-version-downloaded-cb
+(comment defn- new-version-downloaded-cb
   [_ notes name date url]
   (.info logger "[update-downloaded]" name notes date url)
   (when-let [web-contents (and @*win (. ^js @*win -webContents))]
@@ -120,26 +119,50 @@
 (defn init-auto-updater
   [repo]
   (when (.valid semver electron-version)
-    (p/let [info (get-latest-artifact-info repo)]
+    
+    (.on autoUpdater "error"
+         (fn [e] (.error logger "[auto-updater]" "updater-error" e)))
+    (.on autoUpdater "checking-for-update"
+         (fn [] (.info logger "[auto-updater]" "checking-for-update")))
+    (.on autoUpdater "update-available"
+         (fn [e] (.info logger "[auto-updater]" "update-available" e)))
+    (.on autoUpdater "update-not-available"
+         (fn [e] (.info logger "[auto-updater]" "update-not-available" e)))
+    (.on autoUpdater "update-downloaded"
+         (fn [e] (.info logger "[auto-updater]" "update-downloaded" e)))
+
+    (p/let [feed-url (str "https://update.electronjs.org/" repo "/" js/process.platform "-" js/process.arch "/" electron-version)
+            ; _ (.setFeedURL autoUpdater feed-url) 
+            info (get-latest-artifact-info repo)
+            ]
       (when-let [remote-version (and info (re-find #"\d+\.\d+\.\d+" (:url info)))]
         (if (and (. semver valid remote-version)
                  (. semver lt electron-version remote-version))
 
-           ;; start auto updater
+          ;; FIXME: start auto updater only when there's new version
           (do
-            (debug "Found remote version" remote-version)
-            (when mac?
+            (.info logger "[updater]" "update-available" remote-version)
+            (when (or mac? win32?)
               (when-let [f (js/require "update-electron-app")]
-                (f #js{:notifyUser false})
-                (.once autoUpdater "update-downloaded"
-                       new-version-downloaded-cb))))
+                (debug "update-electron-app" "inject...")
+                 ;; setup autoUpdater
+                (f {:notifyUser false
+                    :logger logger})
+                (debug "fuck update url" (.getFeedURL autoUpdater))
+                ;; (.checkForUpdates autoUpdater)
+                ;;(.once autoUpdater "update-downloaded"
+                 ;;      new-version-downloaded-cb)
+                )))
 
           (debug "Skip remote version [ahead of pre-release]" remote-version))))))
 
 (defn init-updater
-  [{:keys [repo _logger ^js _win] :as opts}]
-  (and prod? (not= false (cfgs/get-item :auto-update)) (init-auto-updater repo))
-  (let [check-channel "check-for-updates"
+  [{:keys [repo ^js _win] :as opts}]
+  (when (and prod? (true? (cfgs/get-item :auto-update)))
+    (init-auto-updater repo))
+  (debug "inited-updater")
+
+  (comment let [check-channel "check-for-updates"
         install-channel "install-updates"
         check-listener (fn [_e & args]
                          (when-not @*update-pending
