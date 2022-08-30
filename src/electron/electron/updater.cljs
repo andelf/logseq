@@ -13,7 +13,7 @@
 
 (def *update-ready-to-install (atom nil))
 (def *update-pending (atom nil))
-(def debug (partial (.-warn logger) "[updater]"))
+(def debug (partial (.-debug logger) "[updater]"))
 
 ;Event: 'error'
 ;Event: 'checking-for-update'
@@ -42,7 +42,7 @@
            (bean/->clj info))
          (throw (js/Error. (str "[" status "] " text)))))
      (fn [e]
-       (js/console.warn "[update server error] " e)
+       (.warn logger (str "[update server error] " e))
        (throw e)))))
 
 (defn check-for-updates
