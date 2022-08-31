@@ -5,6 +5,7 @@
 
 (defrecord Bfs []
   protocol/Fs
+  (backend-name [_] "bfs")
   (mkdir! [_this dir]
     (when (and js/window.pfs (not (util/electron?)))
       (->

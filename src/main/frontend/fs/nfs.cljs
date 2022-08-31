@@ -65,6 +65,7 @@
 
 (defrecord ^:large-vars/cleanup-todo Nfs []
   protocol/Fs
+  (backend-name [_] "nfs")
   (mkdir! [_this dir]
     (let [parts (->> (string/split dir "/")
                      (remove string/blank?))
@@ -240,4 +241,5 @@
 
   ;; TODO:
   (watch-dir! [_this _dir]
+              (prn ::what-the-fuck)
     nil))

@@ -12,7 +12,7 @@
   []
   [:div.flex.flex-col
    [:h1.title (t :on-boarding/add-graph)]
-   (let [nfs-supported? (or (nfs/supported?) (mobile-util/native-platform?))]
+   (let [nfs-supported? (nfs/supported?)]
      (if (mobile-util/native-platform?)
        [:div.text-sm
         (ui/button "Open a local directory"

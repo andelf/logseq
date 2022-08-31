@@ -3,6 +3,8 @@
   {:clj-kondo/config {:linters {:private-call {:level :off}}}})
 
 (defprotocol Fs
+  (available? [this] "Is current backend avaliable?")
+  (backend-name [this] "Human readable backend fs implementation name")
   (mkdir! [this dir])
   (mkdir-recur! [this dir])
   (readdir [this dir])
@@ -13,7 +15,8 @@
   (rename! [this repo old-path new-path])
   (copy! [this repo old-path new-path])
   (stat [this dir path])
-  (open-dir [this ok-handler])
+  (open-dir [this ok-handler] "Folder picker")
+  ;; [{:path _ :content _ :stat _}]
   (get-files [this path-or-handle ok-handler])
   (watch-dir! [this dir])
   (unwatch-dir! [this dir])

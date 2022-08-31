@@ -1,24 +1,28 @@
 (ns frontend.fs
   (:require [cljs-bean.core :as bean]
+            [clojure.string :as string]
             [frontend.config :as config]
+            [frontend.db :as db]
+            [frontend.encrypt :as encrypt]
+            [frontend.fs.bfs :as bfs]
+            [frontend.fs.capacitor-fs :as mobile]
             [frontend.fs.nfs :as nfs]
             [frontend.fs.node :as node]
-            [frontend.fs.capacitor-fs :as mobile]
-            [frontend.fs.bfs :as bfs]
-            [frontend.mobile.util :as mobile-util]
             [frontend.fs.protocol :as protocol]
+            [frontend.fs.tauri :as tauri]
+            [frontend.mobile.util :as mobile-util]
+            [frontend.state :as state]
             [frontend.util :as util]
             [lambdaisland.glogi :as log]
-            [promesa.core :as p]
-            [frontend.db :as db]
-            [clojure.string :as string]
-            [frontend.encrypt :as encrypt]
-            [frontend.state :as state]))
+            [promesa.core :as p]))
 
 (defonce nfs-record (nfs/->Nfs))
 (defonce bfs-record (bfs/->Bfs))
 (defonce node-record (node/->Node))
 (defonce mobile-record (mobile/->Capacitorfs))
+(defonce tauri-record (tauri/->Tauri))
+
+(prn ::debug-tauri-enabled? (protocol/available? tauri-record))
 
 (defn local-db?
   [dir]
@@ -36,6 +40,9 @@
       (mobile-util/native-platform?)
       mobile-record
 
+      (and (protocol/available? tauri-record) (not bfs-local?))
+
+      tauri-record
       (local-db? dir)
       nfs-record
 
@@ -61,11 +68,9 @@
 
 (defn rmdir!
   "Remove the directory recursively.
-   Warning: only run it for browser cache."
+   Warning: only runs when it is a browser cache(bfs)."
   [dir]
-  (when-let [fs (get-fs dir)]
-    (when (= fs bfs-record)
-      (protocol/rmdir! fs dir))))
+  (protocol/rmdir! (get-fs dir) dir))
 
 (defn write-file!
   [repo dir path content opts]
@@ -107,6 +112,7 @@
 
 (defn rename!
   [repo old-path new-path]
+  ;; See https://github.com/isomorphic-git/lightning-fs/issues/41
   (cond
                                         ; See https://github.com/isomorphic-git/lightning-fs/issues/41
     (= old-path new-path)
@@ -147,6 +153,9 @@
     (mobile-util/native-platform?)
     mobile-record
 
+    (protocol/available? tauri-record)
+    tauri-record
+
     :else
     nfs-record))
 
@@ -154,10 +163,8 @@
   [ok-handler]
   (let [record (get-record)]
     (p/let [result (protocol/open-dir record ok-handler)]
-      (if (or (util/electron?)
-              (mobile-util/native-platform?))
-        (let [[dir & paths] (bean/->clj result)]
-          [(:path dir) paths])
+      (if (or (util/electron?) (mobile-util/native-platform?))
+        (let [[dir & paths] result] [(:path dir) paths])
         result))))
 
 (defn get-files
@@ -173,11 +180,15 @@
 
 (defn watch-dir!
   [dir]
-  (protocol/watch-dir! (get-record) dir))
+  (when (not= dir "/local")
+    (protocol/watch-dir! (get-record) dir)))
 
 (defn unwatch-dir!
   [dir]
-  (protocol/unwatch-dir! (get-record) dir))
+  (when (not= dir "/local")
+    (js/console.log "using fs backend" (protocol/backend-name (get-record)))
+    (protocol/unwatch-dir! (get-record) dir)
+    (js/console.log "ok")))
 
 (defn mkdir-if-not-exists
   [dir]

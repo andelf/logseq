@@ -91,6 +91,7 @@
 
 (defrecord Node []
   protocol/Fs
+  (backend-name [_] "electron")
   (mkdir! [_this dir]
     (ipc/ipc "mkdir" dir))
   (mkdir-recur! [_this dir]

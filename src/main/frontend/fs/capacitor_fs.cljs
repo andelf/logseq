@@ -262,6 +262,7 @@
 
 (defrecord ^:large-vars/cleanup-todo Capacitorfs []
   protocol/Fs
+  (backend-name [_] "capacitorfs")
   (mkdir! [_this dir]
     (-> (.mkdir Filesystem
                 (clj->js
