@@ -22,6 +22,7 @@
             [frontend.components.search :as component-search]
             [frontend.components.shell :as shell]
             [frontend.components.whiteboard :as whiteboard]
+            [frontend.components.user.login :as login]
             [frontend.config :as config]
             [frontend.context.i18n :refer [t]]
             [frontend.db :as db]
@@ -36,7 +37,6 @@
             [frontend.fs.watcher-handler :as fs-watcher]
             [frontend.handler.command-palette :as cp]
             [frontend.handler.common :as common-handler]
-            [frontend.handler.config :as config-handler]
             [frontend.handler.editor :as editor-handler]
             [frontend.handler.file :as file-handler]
             [frontend.handler.file-sync :as file-sync-handler]
@@ -50,6 +50,7 @@
             [frontend.handler.shell :as shell-handler]
             [frontend.handler.ui :as ui-handler]
             [frontend.handler.user :as user-handler]
+            [frontend.handler.whiteboard :as whiteboard-handler]
             [frontend.handler.web.nfs :as nfs-handler]
             [frontend.mobile.core :as mobile]
             [frontend.mobile.graph-picker :as graph-picker]
@@ -68,7 +69,8 @@
             [logseq.db.schema :as db-schema]
             [logseq.graph-parser.config :as gp-config]
             [promesa.core :as p]
-            [rum.core :as rum]))
+            [rum.core :as rum]
+            [logseq.common.path :as path]))
 
 ;; TODO: should we move all events here?
 
@@ -86,10 +88,7 @@
 (defn- enable-beta-features!
   []
   (when-not (false? (state/enable-sync?)) ; user turns it off
-    (file-sync-handler/set-sync-enabled! true))
-
-  (when-not (false? (state/enable-whiteboards?))
-    (config-handler/set-config! :feature/enable-whiteboards? true)))
+    (file-sync-handler/set-sync-enabled! true)))
 
 (defmethod handle :user/fetch-info-and-graphs [[_]]
   (state/set-state! [:ui/loading? :login] false)
@@ -115,13 +114,18 @@
                                     (util/uuid-string? (second (:sync-meta %)))) repos)
                     (sync/<sync-start)))))
             (ui-handler/re-render-root!)
-            (file-sync/maybe-onboarding-show status)
-            (whiteboard/onboarding-show)))))))
+            (file-sync/maybe-onboarding-show status)))))))
 
 (defmethod handle :user/logout [[_]]
   (file-sync-handler/reset-session-graphs)
   (sync/remove-all-pwd!)
-  (file-sync-handler/reset-user-state!))
+  (file-sync-handler/reset-user-state!)
+  (login/sign-out!))
+
+(defmethod handle :user/login [[_ host-ui?]]
+  (if (or host-ui? (not util/electron?))
+    (js/window.open config/LOGIN-URL)
+    (login/open-login-modal!)))
 
 (defmethod handle :graph/added [[_ repo {:keys [empty-graph?]}]]
   (db/set-key-value repo :ast/version db-schema/ast-version)
@@ -382,8 +386,9 @@
         (state/pub-event! [:graph/dir-gone dir]))))
   ;; FIXME: an ugly implementation for redirecting to page on new window is restored
   (repo-handler/graph-ready! repo)
+  ;; Replace initial fs watcher
   (fs-watcher/load-graph-files! repo)
-  ;; TODO: Notify user to update filename format when the UX is smooth enough
+  ;; TODO(junyi): Notify user to update filename format when the UX is smooth enough
   ;; (when-not config/test?
   ;;   (js/setTimeout
   ;;    (fn []
@@ -468,7 +473,8 @@
       (reset! util/keyboard-height keyboard-height)
       (set! (.. main-node -style -marginBottom) (str keyboard-height "px"))
       (when-let [^js html (js/document.querySelector ":root")]
-        (.setProperty (.-style html) "--ls-native-kb-height" (str keyboard-height "px")))
+        (.setProperty (.-style html) "--ls-native-kb-height" (str keyboard-height "px"))
+        (.add (.-classList html) "has-mobile-keyboard"))
       (when-let [left-sidebar-node (gdom/getElement "left-sidebar")]
         (set! (.. left-sidebar-node -style -bottom) (str keyboard-height "px")))
       (when-let [right-sidebar-node (gdom/getElementByClass "sidebar-item-list")]
@@ -490,7 +496,8 @@
       (state/set-state! :mobile/show-recording-bar? false))
     (when (mobile-util/native-ios?)
       (when-let [^js html (js/document.querySelector ":root")]
-        (.removeProperty (.-style html) "--ls-native-kb-height"))
+        (.removeProperty (.-style html) "--ls-native-kb-height")
+        (.remove (.-classList html) "has-mobile-keyboard"))
       (when-let [card-preview-el (js/document.querySelector ".cards-review")]
         (set! (.. card-preview-el -style -marginBottom) "0px"))
       (when-let [card-preview-el (js/document.querySelector ".encryption-password")]
@@ -529,7 +536,7 @@
 (defmethod handle :validate-appId [[_ graph-switch-f graph]]
   (when-let [deprecated-repo (or graph (state/get-current-repo))]
     ;; Installation is not changed for iCloud
-    (if (mobile-util/iCloud-container-path? deprecated-repo)
+    (if (mobile-util/in-iCloud-container-path? deprecated-repo)
       (when graph-switch-f
         (graph-switch-f graph true)
         (state/pub-event! [:graph/ready (state/get-current-repo)]))
@@ -562,36 +569,44 @@
               (file-sync-restart!))))
         (state/pub-event! [:graph/ready (state/get-current-repo)])))))
 
-(defmethod handle :plugin/consume-updates [[_ id pending? updated?]]
-  (let [downloading? (:plugin/updates-downloading? @state/state)]
-
+(defmethod handle :plugin/consume-updates [[_ id prev-pending? updated?]]
+  (let [downloading?   (:plugin/updates-downloading? @state/state)
+        auto-checking? (plugin-handler/get-auto-checking?)]
     (when-let [coming (and (not downloading?)
                            (get-in @state/state [:plugin/updates-coming id]))]
       (let [error-code (:error-code coming)
-            error-code (if (= error-code (str :no-new-version)) nil error-code)]
-        (when (or pending? (not error-code))
-          (notification/show!
-            (str "[Checked]<" (:title coming) "> " error-code)
-            (if error-code :error :success)))))
+            error-code (if (= error-code (str :no-new-version)) nil error-code)
+            title      (:title coming)]
+        (when (and prev-pending? (not auto-checking?))
+          (if-not error-code
+            (plugin/set-updates-sub-content! (str title "...") 0)
+            (notification/show!
+              (str "[Checked]<" title "> " error-code) :error)))))
 
     (if (and updated? downloading?)
       ;; try to start consume downloading item
-      (if-let [n (state/get-next-selected-coming-update)]
-        (plugin-handler/check-or-update-marketplace-plugin
-         (assoc n :only-check false :error-code nil)
-         (fn [^js e] (js/console.error "[Download Err]" n e)))
+      (if-let [next-coming (state/get-next-selected-coming-update)]
+        (plugin-handler/check-or-update-marketplace-plugin!
+          (assoc next-coming :only-check false :error-code nil)
+          (fn [^js e] (js/console.error "[Download Err]" next-coming e)))
         (plugin-handler/close-updates-downloading))
 
       ;; try to start consume pending item
-      (if-let [n (second (first (:plugin/updates-pending @state/state)))]
-        (plugin-handler/check-or-update-marketplace-plugin
-         (assoc n :only-check true :error-code nil)
-         (fn [^js e]
-           (notification/show! (.toString e) :error)
-           (js/console.error "[Check Err]" n e)))
+      (if-let [next-pending (second (first (:plugin/updates-pending @state/state)))]
+        (do
+          (println "Updates: take next pending - " (:id next-pending))
+          (js/setTimeout
+            #(plugin-handler/check-or-update-marketplace-plugin!
+               (assoc next-pending :only-check true :auto-check auto-checking? :error-code nil)
+               (fn [^js e]
+                 (notification/show! (.toString e) :error)
+                 (js/console.error "[Check Err]" next-pending e))) 500))
+
         ;; try to open waiting updates list
-        (when (and pending? (seq (state/all-available-coming-updates)))
-          (plugin/open-waiting-updates-modal!))))))
+        (do (when (and prev-pending? (not auto-checking?)
+                       (seq (state/all-available-coming-updates)))
+              (plugin/open-waiting-updates-modal!))
+            (plugin-handler/set-auto-checking! false))))))
 
 (defmethod handle :plugin/hook-db-tx [[_ {:keys [blocks tx-data tx-meta] :as payload}]]
   (when-let [payload (and (seq blocks)
@@ -608,10 +623,13 @@
 
 (defmethod handle :mobile-file-watcher/changed [[_ ^js event]]
   (let [type (.-event event)
-        payload (-> event
-                    (js->clj :keywordize-keys true)
-                    (update :path (fn [path]
-                                    (when (string? path) (capacitor-fs/normalize-file-protocol-path nil path)))))]
+        payload (js->clj event :keywordize-keys true)
+        dir (:dir payload)
+        payload (-> payload
+                    (update :path
+                           (fn [path]
+                             (when (string? path)
+                               (path/relative-path dir path)))))]
     (fs-watcher/handle-changed! type payload)
     (when (file-sync-handler/enable-sync?)
      (sync/file-watch-handler type payload))))
@@ -718,7 +736,7 @@
 
 (defmethod handle :editor/set-org-mode-heading [[_ block heading]]
   (when-let [id (:block/uuid block)]
-    (editor-handler/set-heading! id :org heading)))
+    (editor-handler/set-heading! id heading)))
 
 (defmethod handle :file-sync-graph/restore-file [[_ graph page-entity content]]
   (when (db/get-db graph)
@@ -920,6 +938,12 @@
 (defmethod handle :run/cli-command [[_ command content]]
   (when (and command (not (string/blank? content)))
     (shell-handler/run-cli-command-wrapper! command content)))
+
+(defmethod handle :whiteboard/undo [[_ e]]
+  (whiteboard-handler/undo! e))
+
+(defmethod handle :whiteboard/redo [[_ e]]
+  (whiteboard-handler/redo! e))
 
 (defmethod handle :editor/quick-capture [[_ args]]
   (quick-capture/quick-capture args))

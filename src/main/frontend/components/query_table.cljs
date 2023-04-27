@@ -12,7 +12,7 @@
             [frontend.format.block :as block]
             [medley.core :as medley]
             [rum.core :as rum]
-            [frontend.modules.outliner.tree :as tree]))
+            [logseq.graph-parser.text :as text]))
 
 ;; Util fns
 ;; ========
@@ -27,7 +27,7 @@
       (map #(medley/dissoc-in % ks) result)
       result)))
 
-(defn- sort-by-fn [sort-by-column item]
+(defn- sort-by-fn [sort-by-column item {:keys [page?]}]
   (case sort-by-column
     :created-at
     (:block/created-at item)
@@ -36,7 +36,7 @@
     :block
     (:block/content item)
     :page
-    (:block/name item)
+    (if page? (:block/name item) (get-in item [:block/page :block/name]))
     (get-in item [:block/properties sort-by-column])))
 
 (defn- locale-compare
@@ -46,11 +46,12 @@
       (< x y)
       (.localeCompare (str x) (str y) (state/sub :preferred-language) #js {:numeric true})))
 
-(defn- sort-result [result {:keys [sort-by-column sort-desc? sort-nlp-date?]}]
+(defn- sort-result [result {:keys [sort-by-column sort-desc? sort-nlp-date? page?]}]
   (if (some? sort-by-column)
     (let [comp-fn (if sort-desc? #(locale-compare %2 %1) locale-compare)]
       (sort-by (fn [item]
-                 (block/normalize-block (sort-by-fn sort-by-column item) sort-nlp-date?))
+                 (block/normalize-block (sort-by-fn sort-by-column item {:page? page?})
+                                        sort-nlp-date?))
                comp-fn
                result))
     result))
@@ -93,13 +94,14 @@
   (let [keys (->> (distinct (mapcat keys (map :block/properties result)))
                   (remove (property/built-in-properties))
                   (remove #{:template}))
-        keys (if page? (cons :page keys) (cons :block keys))
+        keys (if page? (cons :page keys) (concat '(:block :page) keys))
         keys (if page? (distinct (concat keys [:created-at :updated-at])) keys)]
     keys))
 
 (defn- get-columns [current-block result {:keys [page?]}]
   (let [query-properties (some-> (get-in current-block [:block/properties :query-properties] "")
                                  (common-handler/safe-read-string "Parsing query properties failed"))
+        query-properties (if page? (remove #{:block} query-properties) query-properties)
         columns (if (seq query-properties)
                   query-properties
                   (get-keys result page?))
@@ -111,24 +113,62 @@
                included-columns)
        columns))))
 
-;; Table rows are called items
+(defn- build-column-value
+  "Builds a column's tuple value for a query table given a row, column and
+  options"
+  [row column {:keys [page? ->elem map-inline config comma-separated-property?]}]
+  (case column
+    :page
+    [:string (if page?
+               (or (:block/original-name row)
+                   (:block/name row))
+               (or (get-in row [:block/page :block/original-name])
+                   (get-in row [:block/page :block/name])))]
+
+    :block       ; block title
+    (let [content (:block/content row)
+          {:block/keys [title]} (block/parse-title-and-body
+                                 (:block/uuid row)
+                                 (:block/format row)
+                                 (:block/pre-block? row)
+                                 content)]
+      (if (seq title)
+        [:element (->elem :div (map-inline config title))]
+        [:string content]))
+
+    :created-at
+    [:string (when-let [created-at (:block/created-at row)]
+               (date/int->local-time-2 created-at))]
+
+    :updated-at
+    [:string (when-let [updated-at (:block/updated-at row)]
+               (date/int->local-time-2 updated-at))]
+
+    [:string (if comma-separated-property?
+               ;; Return original properties since comma properties need to
+               ;; return collections for display purposes
+               (get-in row [:block/properties column])
+               (or (get-in row [:block/properties-text-values column])
+                   ;; Fallback to original properties for page blocks
+                   (get-in row [:block/properties column])))]))
+
 (rum/defcs result-table < rum/reactive
   (rum/local false ::select?)
+  (rum/local false ::mouse-down?)
   [state config current-block result {:keys [page?]} map-inline page-cp ->elem inline-text]
   (when current-block
-    (let [result (tree/filter-top-level-blocks result)
-          select? (get state ::select?)
-          ;; remove templates
-          result (remove (fn [b] (some? (get-in b [:block/properties :template]))) result)
-          result (if page? result (attach-clock-property result))
+    (let [select? (get state ::select?)
+          *mouse-down? (::mouse-down? state)
+          result' (if page? result (attach-clock-property result))
           clock-time-total (when-not page?
-                             (->> (map #(get-in % [:block/properties :clock-time] 0) result)
+                             (->> (map #(get-in % [:block/properties :clock-time] 0) result')
                                   (apply +)))
-          columns (get-columns current-block result {:page? page?})
+          columns (get-columns current-block result' {:page? page?})
           ;; Sort state needs to be in sync between final result and sortable title
           ;; as user needs to know if there result is sorted
           sort-state (get-sort-state current-block)
-          result' (sort-result result sort-state)]
+          sort-result (sort-result result (assoc sort-state :page? page?))
+          property-separated-by-commas? (partial text/separated-by-commas? (state/get-config))]
       [:div.overflow-x-auto {:on-mouse-down (fn [e] (.stopPropagation e))
                              :style {:width "100%"}
                              :class (when-not page? "query-table")}
@@ -142,52 +182,35 @@
                              (name column))]
               (sortable-title title column sort-state (:block/uuid current-block))))]]
         [:tbody
-         (for [item result']
-           (let [format (:block/format item)]
+         (for [row sort-result]
+           (let [format (:block/format row)]
              [:tr.cursor
               (for [column columns]
-                (let [value (case column
-                              :page
-                              [:string (or (:block/original-name item)
-                                           (:block/name item))]
-
-                              :block       ; block title
-                              (let [content (:block/content item)
-                                    {:block/keys [title]} (block/parse-title-and-body
-                                                           (:block/uuid item)
-                                                           (:block/format item)
-                                                           (:block/pre-block? item)
-                                                           content)]
-                                (if (seq title)
-                                  [:element (->elem :div (map-inline config title))]
-                                  [:string content]))
-
-                              :created-at
-                              [:string (when-let [created-at (:block/created-at item)]
-                                         (date/int->local-time-2 created-at))]
-
-                              :updated-at
-                              [:string (when-let [updated-at (:block/updated-at item)]
-                                         (date/int->local-time-2 updated-at))]
-
-                              [:string (or (get-in item [:block/properties-text-values column])
-                                           ;; Fallback to property relationships for page blocks
-                                           (get-in item [:block/properties column]))])]
-                  [:td.whitespace-nowrap {:on-mouse-down (fn [] (reset! select? false))
+                (let [value (build-column-value row
+                                                column
+                                                {:page? page?
+                                                 :->elem ->elem
+                                                 :map-inline map-inline
+                                                 :config config
+                                                 :comma-separated-property? (property-separated-by-commas? column)})]
+                  [:td.whitespace-nowrap {:on-mouse-down (fn []
+                                                           (reset! *mouse-down? true)
+                                                           (reset! select? false))
                                           :on-mouse-move (fn [] (reset! select? true))
                                           :on-mouse-up (fn []
-                                                         (when-not @select?
+                                                         (when (and @*mouse-down? (not @select?))
                                                            (state/sidebar-add-block!
                                                             (state/get-current-repo)
-                                                            (:db/id item)
-                                                            :block-ref)))}
+                                                            (:db/id row)
+                                                            :block-ref)
+                                                           (reset! *mouse-down? false)))}
                    (when value
                      (if (= :element (first value))
                        (second value)
                        (let [value (second value)]
                          (if (coll? value)
-                           (let [vals (for [item value]
-                                        (page-cp {} {:block/name item}))]
+                           (let [vals (for [row value]
+                                        (page-cp {} {:block/name row}))]
                              (interpose [:span ", "] vals))
                            (cond
                              (boolean? value) (str value)

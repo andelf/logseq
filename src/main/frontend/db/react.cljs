@@ -51,7 +51,11 @@
 
 (defonce query-state (atom {}))
 
+;; Current dynamic component
 (def ^:dynamic *query-component*)
+
+;; Which reactive queries are triggered by the current component
+(def ^:dynamic *reactive-queries*)
 
 ;; component -> query-key
 (defonce query-components (atom {}))
@@ -81,11 +85,6 @@
     (let [new-result' (f @result-atom)]
       (reset! result-atom new-result'))))
 
-(defn get-query-time
-  [q]
-  (let [k [(state/get-current-repo) :custom q]]
-    (get-in @query-state [k :query-time])))
-
 (defn kv
   [key value]
   {:db/id -1
@@ -113,12 +112,12 @@
   [k query time inputs result-atom transform-fn query-fn inputs-fn]
   (let [time' (int (util/safe-parse-float time))] ;; for robustness. `time` should already be float
     (swap! query-state assoc k {:query query
-                               :query-time time'
-                               :inputs inputs
-                               :result result-atom
-                               :transform-fn transform-fn
-                               :query-fn query-fn
-                               :inputs-fn inputs-fn}))
+                                :query-time time'
+                                :inputs inputs
+                                :result result-atom
+                                :transform-fn transform-fn
+                                :query-fn query-fn
+                                :inputs-fn inputs-fn}))
   result-atom)
 
 (defn remove-q!
@@ -149,7 +148,11 @@
 
 (defn get-query-cached-result
   [k]
-  (:result (get @query-state k)))
+  (when-let [result (get @query-state k)]
+    (when (satisfies? IWithMeta @(:result result))
+      (set! (.-state (:result result))
+           (with-meta @(:result result) {:query-time (:query-time result)})))
+    (:result result)))
 
 (defn q
   [repo k {:keys [use-cache? transform-fn query-fn inputs-fn disable-reactive?]
@@ -157,11 +160,14 @@
                 transform-fn identity}} query & inputs]
   {:pre [(s/valid? ::react-query-keys k)]}
   (let [kv? (and (vector? k) (= :kv (first k)))
+        origin-key k
         k (vec (cons repo k))]
     (when-let [db (conn/get-db repo)]
       (let [result-atom (get-query-cached-result k)]
         (when-let [component *query-component*]
           (add-query-component! k component))
+        (when-let [queries *reactive-queries*]
+          (swap! queries conj origin-key))
         (if (and use-cache? result-atom)
           result-atom
           (let [{:keys [result time]} (util/with-time
@@ -257,9 +263,11 @@
                                          (:db/id (:block/page block)))
                                 blocks [[::block (:db/id block)]]
                                 path-refs (:block/path-refs block)
-                                path-refs' (keep (fn [ref]
-                                                   (when-not (= (:db/id ref) page-id)
-                                                     [::refs (:db/id ref)])) path-refs)
+                                path-refs' (->> (keep (fn [ref]
+                                                        (when-not (= (:db/id ref) page-id)
+                                                          [[::refs (:db/id ref)]
+                                                           [::block (:db/id ref)]])) path-refs)
+                                                (apply concat))
                                 page-blocks (when page-id
                                               [[::page-blocks page-id]])]
                             (concat blocks page-blocks path-refs')))
@@ -267,7 +275,8 @@
 
                        (mapcat
                         (fn [ref]
-                          [[::refs ref]])
+                          [[::refs ref]
+                           [::block ref]])
                         refs)
 
                        (when-let [current-page-id (:db/id (get-current-page))]

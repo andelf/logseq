@@ -1,6 +1,7 @@
 (ns frontend.util-test
   (:require [cljs.test :refer [deftest is testing]]
             [frontend.util :as util]
+            [frontend.config :as config]
             [frontend.modules.shortcut.data-helper :as shortcut-data-helper]))
 
 (deftest test-find-first
@@ -20,17 +21,6 @@
     (is (= 2 (util/safe-inc-current-pos-from-start "😀" 0)))
     (is (= 2 (util/safe-inc-current-pos-from-start "abcde" 1)))
     (is (= 1 (util/safe-inc-current-pos-from-start "中文" 0)))))
-
-(deftest test-safe-path-join
-  (testing "safe path join with custom schema"
-    (is (= (util/node-path.join "a/b" "c/d.md") "a/b/c/d.md"))
-    (is (= (util/node-path.join "a/b/c" "../../d.md") "a/d.md"))
-    (is (= (util/node-path.join "file:///a/b" "c/d.md") "file:///a/b/c/d.md"))
-    (is (= (util/node-path.join "file:///a/b" "../d.md") "file:///a/d.md"))
-    (is (= (util/node-path.join "file:///a   a2/b" "c/d.md") "file:///a   a2/b/c/d.md"))
-    (is (= (util/node-path.join "C:/a2/b" "c/d.md") "C:/a2/b/c/d.md"))
-    (is (= (util/node-path.join "content://a/b" "../d.md") "content://a/d.md"))
-    (is (= (util/node-path.join "https://logseq.com/a/b" "c/d.md") "https://logseq.com/a/b/c/d.md"))))
 
 (deftest test-memoize-last
   (testing "memoize-last add test"
@@ -107,3 +97,16 @@
                                          :date-picker/prev-week        ["up" "ctrl+p"]
                                          :date-picker/next-week        "down"}))
       (is (= @actual-ops 3)))))
+
+(deftest test-media-format-from-input
+  (testing "predicate file type from ext (html5 supported)"
+    (is (= (config/ext-of-audio? "file.mp3") true))
+    (is (= (config/ext-of-audio? "fIle.mP3") true))
+    (is (= (config/ext-of-audio? "https://x.com/file.mp3") true))
+    (is (= (config/ext-of-audio? "file.wma") false))
+    (is (= (config/ext-of-audio? "file.wma" false) true))
+    (is (= (config/ext-of-video? "file.mp4") true))
+    (is (= (config/ext-of-video? "file.mp3") false))
+    (is (= (config/ext-of-image? "file.svg") true))
+    (is (= (config/ext-of-image? "a.file.png") true))
+    (is (= (config/ext-of-image? "file.tiff") false))))

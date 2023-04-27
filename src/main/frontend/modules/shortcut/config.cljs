@@ -15,6 +15,7 @@
             [frontend.handler.export :as export-handler]
             [frontend.handler.whiteboard :as whiteboard-handler]
             [frontend.handler.plugin-config :as plugin-config-handler]
+            [frontend.modules.editor.undo-redo :as undo-redo]
             [frontend.modules.shortcut.dicts :as dicts]
             [frontend.modules.shortcut.before :as m]
             [frontend.state :as state]
@@ -69,6 +70,78 @@
 
    :pdf/find                     {:binding "alt+f"
                                   :fn      pdf-utils/open-finder}
+
+   :whiteboard/select            {:binding ["1" "s"]
+                                  :fn      #(.selectTool (state/active-tldraw-app) "select")}
+   
+   :whiteboard/pan               {:binding ["2" "p"]
+                                  :fn      #(.selectTool (state/active-tldraw-app) "move")}
+   
+   :whiteboard/portal            {:binding "3"
+                                  :fn      #(.selectTool (state/active-tldraw-app) "logseq-portal")}
+
+   :whiteboard/pencil            {:binding ["4" "d"]
+                                  :fn      #(.selectTool (state/active-tldraw-app) "pencil")}
+
+   :whiteboard/highlighter       {:binding ["5" "h"]
+                                  :fn      #(.selectTool (state/active-tldraw-app) "highlighter")}
+   
+   :whiteboard/eraser            {:binding ["6" "e"]
+                                  :fn      #(.selectTool (state/active-tldraw-app) "erase")}
+   
+   :whiteboard/connector         {:binding ["7" "c"]
+                                  :fn      #(.selectTool (state/active-tldraw-app) "line")}
+   
+   :whiteboard/text              {:binding ["8" "t"]
+                                  :fn      #(.selectTool (state/active-tldraw-app) "text")}
+
+   :whiteboard/rectangle         {:binding ["9" "r"]
+                                  :fn      #(.selectTool (state/active-tldraw-app) "box")}
+
+   :whiteboard/ellipse           {:binding "o"
+                                  :fn      #(.selectTool (state/active-tldraw-app) "ellipse")}
+
+   :whiteboard/reset-zoom        {:binding "shift+0"
+                                  :fn      #(.resetZoom (.-api ^js (state/active-tldraw-app)))}
+
+   :whiteboard/zoom-to-fit       {:binding "shift+1"
+                                  :fn      #(.zoomToFit (.-api ^js (state/active-tldraw-app)))}
+
+   :whiteboard/zoom-to-selection {:binding "shift+2"
+                                  :fn      #(.zoomToSelection (.-api ^js (state/active-tldraw-app)))}
+
+   :whiteboard/zoom-out          {:binding "shift+dash"
+                                  :fn      #(.zoomOut (.-api ^js (state/active-tldraw-app)) false)}
+
+   :whiteboard/zoom-in           {:binding "shift+="
+                                  :fn      #(.zoomIn (.-api ^js (state/active-tldraw-app)) false)}
+
+   :whiteboard/send-backward     {:binding "["
+                                  :fn      #(.sendBackward (state/active-tldraw-app))}
+
+   :whiteboard/send-to-back      {:binding "shift+["
+                                  :fn      #(.sendToBack (state/active-tldraw-app))}
+
+   :whiteboard/bring-forward     {:binding "]"
+                                  :fn      #(.bringForward (state/active-tldraw-app))}
+
+   :whiteboard/bring-to-front    {:binding "shift+]"
+                                  :fn      #(.bringToFront (state/active-tldraw-app))}
+
+   :whiteboard/lock              {:binding "mod+l"
+                                  :fn      #(.setLocked (state/active-tldraw-app) true)}
+
+   :whiteboard/unlock            {:binding "mod+shift+l"
+                                  :fn      #(.setLocked (state/active-tldraw-app) false)}
+
+   :whiteboard/group             {:binding "mod+g"
+                                  :fn      #(.doGroup (.-api ^js (state/active-tldraw-app)))}
+
+   :whiteboard/ungroup           {:binding "mod+shift+g"
+                                  :fn      #(.unGroup (.-api ^js (state/active-tldraw-app)))}
+
+   :whiteboard/toggle-grid       {:binding "shift+g"
+                                  :fn      #(.toggleGrid (.-api ^js (state/active-tldraw-app)))}
 
    :auto-complete/complete       {:binding "enter"
                                   :fn      ui-handler/auto-complete-complete}
@@ -170,7 +243,7 @@
                        :fn      editor-handler/copy-current-block-embed}
 
    :editor/paste-text-in-one-block-at-point {:binding "mod+shift+v"
-                                             :fn      (fn [_state e] ((paste-handler/editor-on-paste! nil true) e))}
+                                             :fn      paste-handler/editor-on-paste-raw!}
 
    :editor/insert-youtube-timestamp         {:binding "mod+shift+y"
                                              :fn      commands/insert-youtube-timestamp}
@@ -239,7 +312,7 @@
    :editor/undo                    {:binding "mod+z"
                                     :fn      history/undo!}
 
-   :editor/redo                    {:binding ["shift+mod+z" "mod+y"]
+   :editor/redo                    {:binding ["mod+shift+z" "mod+y"]
                                     :fn      history/redo!}
 
    :editor/insert-link             {:binding "mod+l"
@@ -256,6 +329,8 @@
 
    :editor/zoom-out                {:binding (if mac? "mod+," "alt+left")
                                     :fn      editor-handler/zoom-out!}
+
+   :editor/toggle-undo-redo-mode   {:fn      undo-redo/toggle-undo-redo-mode!}
 
    :ui/toggle-brackets             {:binding "mod+c mod+b"
                                     :fn      config-handler/toggle-ui-show-brackets!}
@@ -313,7 +388,7 @@
                                                 (editor-handler/escape-editing)
                                                 (state/pub-event! [:modal/command-palette]))}
 
-   :graph/export-as-html           {:fn #(export-handler/export-repo-as-html!
+   :graph/export-as-html           {:fn #(export-handler/download-repo-as-html!
                                           (state/get-current-repo))
                                     :binding false}
 
@@ -335,7 +410,7 @@
 
    :graph/re-index                 {:fn (fn []
                                           (p/let [multiple-windows? (ipc/ipc "graphHasMultipleWindows" (state/get-current-repo))]
-                                                 (state/pub-event! [:graph/ask-for-re-index (atom multiple-windows?) nil])))
+                                            (state/pub-event! [:graph/ask-for-re-index (atom multiple-windows?) nil])))
                                     :binding false}
 
    :command/run                    {:binding "mod+shift+1"
@@ -413,6 +488,10 @@
                                      :inactive (not (util/electron?))
                                      :fn      page-handler/copy-current-file}
 
+   :editor/copy-page-url            {:binding false
+                                     :inactive (not (util/electron?))
+                                     :fn      page-handler/copy-page-url}
+
    :ui/toggle-wide-mode             {:binding "t w"
                                      :fn      ui-handler/toggle-wide-mode!}
 
@@ -437,6 +516,7 @@
                                      :fn      ui-handler/toggle-cards!}
 
    :git/commit                      {:binding "mod+g c"
+                                     :inactive (not (util/electron?))
                                      :fn      commit/show-commit-modal!}
 
    :dev/show-block-data            {:binding false
@@ -499,6 +579,33 @@
                              :pdf/find])
         (with-meta {:before m/enable-when-not-editing-mode!}))
 
+    :shortcut.handler/whiteboard
+    (-> (build-category-map [:whiteboard/select
+                             :whiteboard/pan
+                             :whiteboard/portal
+                             :whiteboard/pencil
+                             :whiteboard/highlighter
+                             :whiteboard/eraser
+                             :whiteboard/connector
+                             :whiteboard/text
+                             :whiteboard/rectangle
+                             :whiteboard/ellipse
+                             :whiteboard/reset-zoom
+                             :whiteboard/zoom-to-fit
+                             :whiteboard/zoom-to-selection
+                             :whiteboard/zoom-out
+                             :whiteboard/zoom-in
+                             :whiteboard/send-backward
+                             :whiteboard/send-to-back
+                             :whiteboard/bring-forward
+                             :whiteboard/bring-to-front
+                             :whiteboard/lock
+                             :whiteboard/unlock
+                             :whiteboard/group
+                             :whiteboard/ungroup
+                             :whiteboard/toggle-grid])
+        (with-meta {:before m/enable-when-not-editing-mode!}))
+
     :shortcut.handler/auto-complete
     (build-category-map [:auto-complete/complete
                          :auto-complete/prev
@@ -544,8 +651,7 @@
 
     :shortcut.handler/editor-global
     (->
-     (build-category-map [
-                          :graph/export-as-html
+     (build-category-map [:graph/export-as-html
                           :graph/open
                           :graph/remove
                           :graph/add
@@ -572,8 +678,6 @@
                           :editor/copy
                           :editor/copy-text
                           :editor/cut
-                          :editor/undo
-                          :editor/redo
                           :command/toggle-favorite])
      (with-meta {:before m/enable-when-not-component-editing!}))
 
@@ -583,6 +687,9 @@
                           :editor/select-all-blocks
                           :editor/zoom-in
                           :editor/zoom-out
+                          :editor/toggle-undo-redo-mode
+                          :editor/undo
+                          :editor/redo
                           :ui/toggle-brackets
                           :go/search-in-page
                           :go/search
@@ -625,6 +732,7 @@
                           :editor/open-file-in-default-app
                           :editor/open-file-in-directory
                           :editor/copy-current-file
+                          :editor/copy-page-url
                           :editor/new-whiteboard
                           :ui/toggle-wide-mode
                           :ui/select-theme-color
@@ -667,6 +775,7 @@
    [:editor/bold
     :editor/insert-link
     :editor/italics
+    :editor/strike-through
     :editor/highlight]
 
    :shortcut.category/navigating
@@ -737,6 +846,7 @@
    :shortcut.category/toggle
    [:ui/toggle-help
     :editor/toggle-open-blocks
+    :editor/toggle-undo-redo-mode
     :ui/toggle-wide-mode
     :ui/toggle-cards
     :ui/toggle-document-mode
@@ -747,6 +857,33 @@
     :ui/toggle-settings
     :ui/toggle-contents]
 
+   :shortcut.category/whiteboard
+   [:editor/new-whiteboard
+    :whiteboard/select
+    :whiteboard/pan
+    :whiteboard/portal
+    :whiteboard/pencil
+    :whiteboard/highlighter
+    :whiteboard/eraser
+    :whiteboard/connector
+    :whiteboard/text
+    :whiteboard/rectangle
+    :whiteboard/ellipse
+    :whiteboard/reset-zoom
+    :whiteboard/zoom-to-fit
+    :whiteboard/zoom-to-selection
+    :whiteboard/zoom-out
+    :whiteboard/zoom-in
+    :whiteboard/send-backward
+    :whiteboard/send-to-back
+    :whiteboard/bring-forward
+    :whiteboard/bring-to-front
+    :whiteboard/lock
+    :whiteboard/unlock
+    :whiteboard/group
+    :whiteboard/ungroup
+    :whiteboard/toggle-grid]
+   
    :shortcut.category/others
    [:pdf/previous-page
     :pdf/next-page
@@ -768,7 +905,7 @@
     :editor/insert-youtube-timestamp
     :editor/open-file-in-default-app
     :editor/open-file-in-directory
-    :editor/new-whiteboard
+    :editor/copy-page-url
     :auto-complete/prev
     :auto-complete/next
     :auto-complete/complete

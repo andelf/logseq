@@ -14,6 +14,12 @@ export enum Color {
   Default = '',
 }
 
+export enum Geometry {
+  Box = 'box',
+  Ellipse = 'ellipse',
+  Polygon = 'polygon',
+}
+
 export enum AlignType {
   Top = 'top',
   CenterVertical = 'centerVertical',
@@ -141,6 +147,11 @@ export type TLPasteEventInfo = {
   fromDrop?: boolean
 }
 
+export type TLCopyEventInfo = {
+  text: string
+  html: string
+}
+
 /* --------------------- Events --------------------- */
 
 export type TLSubscriptionEvent =
@@ -150,15 +161,7 @@ export type TLSubscriptionEvent =
     }
   | {
       event: 'persist'
-      info: null
-    }
-  | {
-      event: 'save'
-      info: null
-    }
-  | {
-      event: 'saveAs'
-      info: null
+      info: { replace: boolean }
     }
   | {
       event: 'undo'
@@ -187,6 +190,10 @@ export type TLSubscriptionEvent =
   | {
       event: 'drop'
       info: { dataTransfer: DataTransfer; point: number[] }
+    }
+  | {
+      event: 'copy'
+      info: TLCopyEventInfo
     }
   | {
       event: 'paste'
@@ -245,8 +252,6 @@ export interface TLCallbacks<
 > {
   onMount: TLCallback<S, K, R, 'mount'>
   onPersist: TLCallback<S, K, R, 'persist'>
-  onSave: TLCallback<S, K, R, 'save'>
-  onSaveAs: TLCallback<S, K, R, 'saveAs'>
   onError: TLCallback<S, K, R, 'error'>
 }
 

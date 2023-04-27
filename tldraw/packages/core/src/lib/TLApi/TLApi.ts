@@ -11,8 +11,10 @@ export class TLApi<S extends TLShape = TLShape, K extends TLEventMap = TLEventMa
     this.app = app
   }
 
-  editShape = (shape: string | S | undefined): this => {
-    this.app.transition('select').selectedTool.transition('editingShape', { shape })
+  editShape = (shape: S | undefined): this => {
+    if (!shape?.props.isLocked)
+      this.app.transition('select').selectedTool.transition('editingShape', { shape })
+
     return this
   }
 
@@ -41,7 +43,9 @@ export class TLApi<S extends TLShape = TLShape, K extends TLEventMap = TLEventMa
    *
    * @param shapes The serialized shape changes to apply.
    */
-  updateShapes = <T extends S>(...shapes: ({ id: string } & Partial<T['props']>)[]): this => {
+  updateShapes = <T extends S>(
+    ...shapes: ({ id: string; type: string } & Partial<T['props']>)[]
+  ): this => {
     this.app.updateShapes(shapes)
     return this
   }
@@ -174,20 +178,23 @@ export class TLApi<S extends TLShape = TLShape, K extends TLEventMap = TLEventMa
     settings.update({ color: color })
 
     this.app.selectedShapesArray.forEach(s => {
-      s.update({ fill: color, stroke: color })
+      if (!s.props.isLocked) s.update({ fill: color, stroke: color })
     })
     this.app.persist()
 
     return this
   }
 
-  save = () => {
-    this.app.save()
-    return this
-  }
+  setScaleLevel = (scaleLevel: string): this => {
+    const { settings } = this.app
 
-  saveAs = () => {
-    this.app.save()
+    settings.update({ scaleLevel })
+
+    this.app.selectedShapes.forEach(shape => {
+      if (!shape.props.isLocked) shape.setScaleLevel(scaleLevel)
+    })
+    this.app.persist()
+
     return this
   }
 
@@ -198,6 +205,11 @@ export class TLApi<S extends TLShape = TLShape, K extends TLEventMap = TLEventMa
 
   redo = () => {
     this.app.redo()
+    return this
+  }
+
+  persist = () => {
+    this.app.persist()
     return this
   }
 
@@ -362,6 +374,8 @@ export class TLApi<S extends TLShape = TLShape, K extends TLEventMap = TLEventMa
   }
 
   doGroup = (shapes: S[] = this.app.allSelectedShapesArray) => {
+    if (this.app.readOnly) return
+
     const selectedGroups: S[] = [
       ...shapes.filter(s => s.type === 'group'),
       ...shapes.map(s => this.app.getParentGroup(s)),
@@ -388,6 +402,8 @@ export class TLApi<S extends TLShape = TLShape, K extends TLEventMap = TLEventMa
   }
 
   unGroup = (shapes: S[] = this.app.allSelectedShapesArray) => {
+    if (this.app.readOnly) return
+
     const selectedGroups: S[] = [
       ...shapes.filter(s => s.type === 'group'),
       ...shapes.map(s => this.app.getParentGroup(s)),
@@ -402,5 +418,27 @@ export class TLApi<S extends TLShape = TLShape, K extends TLEventMap = TLEventMa
 
       this.app.setSelectedShapes(shapesInGroups)
     }
+  }
+
+  convertShapes = (type: string, shapes: S[] = this.app.allSelectedShapesArray) => {
+    const ShapeClass = this.app.getShapeClass(type)
+
+    this.app.currentPage.removeShapes(...shapes)
+    const clones = shapes.map(s => {
+      return new ShapeClass({
+        ...s.serialized,
+        type: type,
+      })
+    })
+    this.app.currentPage.addShapes(...clones)
+    this.app.persist()
+    this.app.setSelectedShapes(clones)
+  }
+
+  setCollapsed = (collapsed: boolean, shapes: S[] = this.app.allSelectedShapesArray) => {
+    shapes.forEach(shape => {
+      if (shape.props.type === 'logseq-portal') shape.setCollapsed(collapsed)
+    })
+    this.app.persist()
   }
 }

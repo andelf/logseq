@@ -1,7 +1,9 @@
 (ns frontend.db.query-dsl-test
   (:require [cljs.test :refer [are deftest testing use-fixtures is]]
             [clojure.string :as str]
+            [logseq.graph-parser.util.page-ref :as page-ref]
             [frontend.db :as db]
+            [frontend.util :as util]
             [frontend.db.query-dsl :as query-dsl]
             [frontend.test.helper :as test-helper :include-macros true :refer [load-test-files]]))
 
@@ -44,6 +46,30 @@
 
 ;; Tests
 ;; =====
+
+(deftest pre-transform-test
+  (testing "page references should be quoted and tags should be handled"
+    (are [x y] (= (query-dsl/pre-transform x) y)
+     "#foo"
+     "#tag foo"
+
+     "(and #foo)"
+     "(and #tag foo)"
+
+     "[[test #foo]]"
+     "\"[[test #foo]]\""
+
+     "(and [[test #foo]] (or #foo))"
+     "(and \"[[test #foo]]\" (or #tag foo))"
+
+     "\"for #clojure\""
+     "\"for #clojure\""
+
+     "(and \"for #clojure\")"
+     "(and \"for #clojure\")"
+
+     "(and \"for #clojure\" #foo)"
+     "(and \"for #clojure\" #tag foo)")))
 
 (defn- block-property-queries-test
   []
@@ -117,6 +143,21 @@ prop-d:: nada"}])
   (testing "block property tests with default config"
     (test-helper/with-config {}
       (block-property-queries-test))))
+
+(deftest block-property-query-performance
+  (let [pages (->> (repeat 10 {:tags ["tag1" "tag2"]})
+                   (map-indexed (fn [idx {:keys [tags]}]
+                                  {:file/path (str "pages/page" idx ".md")
+                                   :file/content (if (seq tags)
+                                                   (str "tags:: " (str/join ", " (map page-ref/->page-ref tags)))
+                                                   "")})))
+        _ (load-test-files pages)
+        {:keys [result time]}
+        (util/with-time (dsl-query "(and (property tags tag1) (property tags tag2))"))]
+    ;; Specific number isn't as important as ensuring query doesn't take orders
+    ;; of magnitude longer
+    (is (> 25.0 time) "multi property query perf is reasonable")
+    (is (= 10 (count result)))))
 
 (defn- page-property-queries-test
   []
@@ -528,6 +569,26 @@ created-at:: 1608968448116
     (is (= [10 8]
            (->> (dsl-query "(and (page-property rating) (sort-by rating))")
                 (map #(get-in % [:block/properties :rating])))))))
+
+(deftest simplify-query
+  (are [x y] (= (query-dsl/simplify-query x) y)
+    '(and [[foo]])
+    '[[foo]]
+
+    '(and (and [[foo]]))
+    '[[foo]]
+
+    '(and (or [[foo]]))
+    '[[foo]]
+
+    '(and (not [[foo]]))
+    '(not [[foo]])
+
+    '(and (or (and [[foo]])))
+    '[[foo]]
+
+    '(not (or [[foo]]))
+    '(not [[foo]])))
 
 (comment
  (require '[clojure.pprint :as pprint])

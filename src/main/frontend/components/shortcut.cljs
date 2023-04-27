@@ -104,7 +104,7 @@
      [:td.text-left (t :help/block-reference)]
      [:td.text-right [:code block-ref/left-and-right-parens]]]
     [:tr
-     [:td.text-left (t :command.editor/open-link-in-sidebar)]
+     [:td.text-left (t :help/open-link-in-sidebar)]
      [:td.text-right (ui/render-keyboard-shortcut ["shift" "click"])]]
     [:tr
      [:td.text-left (t :help/context-menu)]
@@ -181,4 +181,5 @@
    (shortcut-table :shortcut.category/block-selection true)
    (shortcut-table :shortcut.category/formatting true)
    (shortcut-table :shortcut.category/toggle true)
+   (when (state/enable-whiteboards?) (shortcut-table :shortcut.category/whiteboard true))
    (shortcut-table :shortcut.category/others true)])
