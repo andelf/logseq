@@ -1,6 +1,9 @@
 import { expect } from '@playwright/test'
-import { test } from './fixtures'
+import { test, traceAll } from './fixtures'
 import { modKey } from './utils'
+
+traceAll()
+
 
 test('enable whiteboards', async ({ page }) => {
   if (await page.$('.nav-header .whiteboard') === null) {
