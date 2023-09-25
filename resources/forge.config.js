@@ -12,18 +12,18 @@ module.exports = {
         "schemes": "logseq"
       }
     ],
-    osxSign: {
+    osxSign: process.env['APPLE_ID'] ? {
       identity: 'Developer ID Application: Tiansheng Qin',
       'hardened-runtime': true,
       entitlements: 'entitlements.plist',
       'entitlements-inherit': 'entitlements.plist',
       'signature-flags': 'library'
-    },
-    osxNotarize: {
+    } : undefined,
+    osxNotarize: process.env['APPLE_ID'] ? {
       appleId: process.env['APPLE_ID'],
       appleIdPassword: process.env['APPLE_ID_PASSWORD'],
       ascProvider: process.env['APPLE_ASC_PROVIDER']
-    },
+    } : undefined,
   },
   makers: [
     {
@@ -50,7 +50,7 @@ module.exports = {
       platforms: ['darwin', 'linux']
     },
     {
-      name: 'electron-forge-maker-appimage',
+      name: '@reforged/maker-appimage',
       platforms: ['linux'],
       config: {
         mimeType: ["x-scheme-handler/logseq"]
